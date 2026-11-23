@@ -17,6 +17,11 @@ $claudeBin = Join-Path $env:APPDATA 'npm/node_modules/@anthropic-ai/claude-code/
 $codexCommand = Get-Command codex.exe -ErrorAction SilentlyContinue | Select-Object -First 1
 $nativePaths = @($claudeBin)
 if ($codexCommand) { $nativePaths += Split-Path -Parent $codexCommand.Source }
+else {
+  $codexVendor = Join-Path $env:APPDATA 'npm/node_modules/@openai/codex/node_modules/@openai/codex-win32-*/vendor/*/bin/codex.exe'
+  $codexNative = Get-Item -Path $codexVendor -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($codexNative) { $nativePaths += $codexNative.DirectoryName }
+}
 $env:PATH = ($nativePaths -join [IO.Path]::PathSeparator) + [IO.Path]::PathSeparator + $env:PATH
 $env:PORT = [string]$Port
 $env:HOSTNAME = $ListenAddress
