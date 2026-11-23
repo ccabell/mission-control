@@ -297,7 +297,19 @@ let lastSyncResult: { ok: boolean; message: string } = { ok: true, message: 'Not
 const SYNC_THROTTLE_MS = 30_000
 
 /** Scan and upsert sessions into the database (throttled to avoid repeated disk scans) */
-export async function syncClaudeSessions(force = false): Promise<{ ok: boolean; message: string }> {
+type SyncResult = { ok: boolean; message: string }
+const syncState = globalThis as typeof globalThis & { __mcClaudeSessionSync?: Promise<SyncResult> }
+
+export function syncClaudeSessions(force = false): Promise<SyncResult> {
+  if (syncState.__mcClaudeSessionSync) return syncState.__mcClaudeSessionSync
+  const pending = syncClaudeSessionsOnce(force).finally(() => {
+    if (syncState.__mcClaudeSessionSync === pending) delete syncState.__mcClaudeSessionSync
+  })
+  syncState.__mcClaudeSessionSync = pending
+  return pending
+}
+
+async function syncClaudeSessionsOnce(force: boolean): Promise<SyncResult> {
   const nowMs = Date.now()
   if (!force && lastSyncAt > 0 && (nowMs - lastSyncAt) < SYNC_THROTTLE_MS) {
     return lastSyncResult

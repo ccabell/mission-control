@@ -34,8 +34,9 @@ describe('CLI binary path resolution (#933)', () => {
   it('defines getCodexCliBinaryPath() with similar structure', () => {
     expect(source).toContain('function getCodexCliBinaryPath()')
     expect(source).toContain('codexCliBinaryPath: string | false | null')
-    expect(source).toContain("spawnSync('codex', ['--version']")
-    expect(source).toContain("codexCliBinaryPath = 'codex'")
+    expect(source).toContain("process.platform === 'win32' ? 'codex.exe' : 'codex'")
+    expect(source).toContain("spawnSync(binary, ['--version']")
+    expect(source).toContain('codexCliBinaryPath = binary')
     expect(source).toContain('codexCliBinaryPath = false')
   })
 

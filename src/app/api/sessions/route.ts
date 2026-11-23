@@ -27,7 +27,8 @@ export async function GET(request: NextRequest) {
     const mappedGatewaySessions = mapGatewaySessions(gatewaySessions)
 
     // Always include local sessions alongside gateway sessions
-    await syncClaudeSessions()
+    // Serve the latest database snapshot while the shared disk refresh runs.
+    void syncClaudeSessions().catch(error => logger.error({ err: error }, 'Background session sync failed'))
     const claudeSessions = getLocalClaudeSessions()
     const codexSessions = getLocalCodexSessions()
     const hermesSessions = getLocalHermesSessions()

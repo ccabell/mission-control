@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ run: vi.fn(), stop: vi.fn(), gateway: vi.fn(), denied: false }))
 vi.mock('@/lib/auth', () => ({ requireRole: () => ({ user: { role: 'operator', username: 'tester', workspace_id: 7 } }) }))
 vi.mock('@/lib/workspace-isolation', () => ({ denyUnscopedResourceForStrictWorkspace: () => mocks.denied ? new Response(null, { status: 403 }) : null }))
@@ -9,6 +9,7 @@ vi.mock('@/lib/rate-limit', () => ({ mutationLimiter: () => null }))
 import { promises as fs } from 'node:fs'
 import { POST as continueSession } from '../continue/route'
 import { POST as controlSession } from '../[id]/control/route'
+afterEach(() => vi.restoreAllMocks())
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -26,6 +27,21 @@ function request(body: unknown) {
   }) as any
 }
 describe('local session controls', () => {
+  it.runIf(process.platform === 'win32')('resumes Claude in the Windows project recorded by its transcript', async () => {
+    vi.spyOn(fs, 'readdir').mockResolvedValue(['synthetic-project'] as any)
+    vi.spyOn(fs, 'open').mockResolvedValue({
+      read: async (buffer: Buffer) => {
+        const text = JSON.stringify({ cwd: 'C:\\Projects2\\builderz-mc-scratch' })
+        buffer.write(text)
+        return { bytesRead: Buffer.byteLength(text) }
+      },
+      close: async () => {},
+    } as any)
+    const response = await continueSession(request({ kind: 'claude-code', id: 'synthetic-session', prompt: 'follow up' }))
+    expect(response.status).toBe(200)
+    expect(mocks.run).toHaveBeenCalledWith(expect.any(String), expect.any(Array),
+      expect.objectContaining({ cwd: 'C:\\Projects2\\builderz-mc-scratch' }))
+  })
   it('continues Claude directly with stdin and an owned cancellation key', async () => {
     const response = await continueSession(request({ kind: 'claude-code', id: 'synthetic-session', prompt: 'follow up' }))
     expect(response.status).toBe(200)

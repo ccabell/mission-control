@@ -18,6 +18,12 @@ function sliceBetween(start: string, end: string): string {
 }
 
 describe('claude runtime dispatch routing (#602)', () => {
+  it('routes explicit Codex runtime before gateway/direct selection without fallback', () => {
+    const branch = sliceBetween("} else if (String(task.agent_runtime_type || '').toLowerCase() === 'codex')", '} else if (useDirectApi')
+    expect(branch).toContain('await callCodexViaCli(task, prompt,')
+    expect(branch).not.toContain('callOpenClawGateway')
+    expect(branch).not.toContain('callDirectly(')
+  })
   it('selects agent_runtime_type in the dispatch query', () => {
     const dispatchLoop = sliceBetween('export async function dispatchAssignedTasks()', '// Auto-routing:')
     expect(dispatchLoop).toContain('a.runtime_type as agent_runtime_type')

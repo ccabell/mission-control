@@ -955,10 +955,11 @@ function getCodexCliBinaryPath(): string | null {
 
   try {
     const { spawnSync } = require('node:child_process')
-    const r = spawnSync('codex', ['--version'], { stdio: 'ignore', timeout: 5000 })
+    const binary = process.platform === 'win32' ? 'codex.exe' : 'codex'
+    const r = spawnSync(binary, ['--version'], { stdio: 'ignore', timeout: 5000 })
     if (r.status === 0) {
-      codexCliBinaryPath = 'codex'
-      return 'codex'
+      codexCliBinaryPath = binary
+      return binary
     }
     codexCliBinaryPath = false
     return null
@@ -1775,6 +1776,9 @@ export async function dispatchAssignedTasks(): Promise<{ ok: boolean; message: s
         // and callDirectly — a claude-runtime agent never falls back to a
         // less restrictive provider; failures surface as dispatch failures.
         agentResponse = await dispatchViaClaudeSession(task, prompt)
+      } else if (String(task.agent_runtime_type || '').toLowerCase() === 'codex') {
+        // An explicitly selected local runtime must not silently use a gateway.
+        agentResponse = await callCodexViaCli(task, prompt, stripProviderPrefix(classifyDirectModel(task)))
       } else if (useDirectApi && !targetSession) {
         // Direct API dispatch — provider chosen by `dispatchModel`. No gateway needed.
         agentResponse = await callDirectly(task, prompt)

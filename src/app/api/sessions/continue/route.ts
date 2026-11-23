@@ -86,7 +86,7 @@ async function resolveClaudeSessionCwd(sessionId: string): Promise<string | null
       if (!trimmed) continue
       try {
         const entry = JSON.parse(trimmed) as { cwd?: unknown }
-        if (typeof entry.cwd === 'string' && entry.cwd.startsWith('/')) {
+        if (typeof entry.cwd === 'string' && path.isAbsolute(entry.cwd)) {
           return entry.cwd
         }
       } catch {
