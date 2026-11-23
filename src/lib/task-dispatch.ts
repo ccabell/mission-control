@@ -1,6 +1,6 @@
 import { existsSync, realpathSync, statSync } from 'node:fs'
 import path from 'node:path'
-import { spawn } from 'node:child_process'
+import { runCliProcess } from './cli-process'
 import { getDatabase, db_helpers } from './db'
 import {
   auditClaudeSessionDispatch,
@@ -54,6 +54,14 @@ interface DispatchableTask {
   tags?: string[]
   /** Raw tasks.metadata JSON — carries optional per-task sandbox overrides. */
   metadata?: string | null
+}
+
+/** Never let a late CLI result revive a moved, reassigned or deleted task. */
+function isTaskRunCurrent(task: Pick<DispatchableTask, 'id' | 'workspace_id' | 'status' | 'assigned_to'>): boolean {
+  const row = getDatabase().prepare('SELECT status, assigned_to FROM tasks WHERE id = ? AND workspace_id = ?')
+    .get(task.id, task.workspace_id) as { status: string; assigned_to: string | null } | undefined
+  const expected = task.status === 'quality_review' ? 'quality_review' : 'in_progress'
+  return row?.status === expected && (row.assigned_to || '') === (task.assigned_to || '')
 }
 
 interface DispatchTokenUsage {
@@ -1020,74 +1028,29 @@ async function callClaudeViaCli(
     'Dispatching task via Claude CLI',
   )
 
-  return await new Promise<AgentResponseParsed>((resolve, reject) => {
-    const claudePath = getClaudeCliBinaryPath()
-    if (!claudePath) {
-      return reject(new Error('Claude CLI not available'))
-    }
-    const proc = spawn(claudePath, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, CI: '1' },
-      ...(sandbox.cwd ? { cwd: sandbox.cwd } : {}),
-    })
-    let stdout = ''
-    let stderr = ''
-    let outputBytes = 0
-    const timeoutMs = 180_000
-    const timer = setTimeout(() => {
-      proc.kill('SIGTERM')
-      reject(new Error(`Claude CLI timed out after ${timeoutMs / 1000}s`))
-    }, timeoutMs)
-    const guardOutput = (chunk: Buffer) => {
-      outputBytes += chunk.length
-      if (outputBytes > CLAUDE_CLI_MAX_OUTPUT_BYTES) {
-        clearTimeout(timer)
-        proc.kill('SIGKILL')
-        reject(new Error(`Claude CLI output exceeded ${CLAUDE_CLI_MAX_OUTPUT_BYTES} bytes`))
-        return false
-      }
-      return true
-    }
-
-    proc.stdout.on('data', (d) => { if (guardOutput(d)) stdout += d.toString() })
-    proc.stderr.on('data', (d) => { if (guardOutput(d)) stderr += d.toString() })
-    proc.on('error', (err) => { clearTimeout(timer); reject(err) })
-    proc.on('close', (code) => {
-      clearTimeout(timer)
-      if (code !== 0) {
-        return reject(new Error(`claude CLI exited ${code}: ${stderr.slice(0, 500) || stdout.slice(0, 500)}`))
-      }
-      try {
-        const parsed = JSON.parse(stdout)
-        const text: string | null = (typeof parsed?.result === 'string' && parsed.result)
-          || (typeof parsed?.output === 'string' && parsed.output)
-          || (typeof parsed?.text === 'string' && parsed.text)
-          || stdout.trim()
-          || null
-        const sessionId: string | null = (typeof parsed?.session_id === 'string' && parsed.session_id)
-          || (typeof parsed?.sessionId === 'string' && parsed.sessionId)
-          || null
-
-        // Record token usage if reported.
-        if (parsed?.usage && (parsed.usage.input_tokens || parsed.usage.output_tokens)) {
-          recordDispatchTokenUsage({
-            model,
-            sessionId: sessionId || `task-${task.id}`,
-            inputTokens: parsed.usage.input_tokens || 0,
-            outputTokens: parsed.usage.output_tokens || 0,
-            workspaceId: task.workspace_id,
-          })
-        }
-
-        resolve({ text, sessionId })
-      } catch {
-        resolve({ text: stdout.trim() || null, sessionId: null })
-      }
-    })
-
-    proc.stdin.write(prompt)
-    proc.stdin.end()
+  const claudePath = getClaudeCliBinaryPath()
+  if (!claudePath) throw new Error('Claude CLI not available')
+  const stdout = await runCliProcess(claudePath, args, {
+    input: prompt, cwd: sandbox.cwd || undefined,
+    env: { ...process.env, CI: '1' }, timeoutMs: 180_000,
+    maxOutputBytes: CLAUDE_CLI_MAX_OUTPUT_BYTES,
+    shouldContinue: () => isTaskRunCurrent(task),
   })
+  let parsed: any
+  try { parsed = JSON.parse(stdout) } catch {
+    return { text: stdout.trim() || null, sessionId: null }
+  }
+  if (parsed?.is_error) throw new Error('Claude CLI reported an unsuccessful result')
+  const sessionId = typeof parsed?.session_id === 'string' ? parsed.session_id
+    : typeof parsed?.sessionId === 'string' ? parsed.sessionId : null
+  if (parsed?.usage && (parsed.usage.input_tokens || parsed.usage.output_tokens)) {
+    recordDispatchTokenUsage({ model, sessionId: sessionId || `task-${task.id}`,
+      inputTokens: parsed.usage.input_tokens || 0, outputTokens: parsed.usage.output_tokens || 0,
+      workspaceId: task.workspace_id })
+  }
+  const text = [parsed?.result, parsed?.output, parsed?.text].find(value => typeof value === 'string' && value)
+  return { text: text || stdout.trim() || null, sessionId }
+
 }
 
 /**
@@ -1323,41 +1286,24 @@ async function callCodexViaCli(
     'Dispatching task via Codex CLI',
   )
 
-  return await new Promise<AgentResponseParsed>((resolve, reject) => {
-    const codexPath = getCodexCliBinaryPath()
-    if (!codexPath) {
-      return reject(new Error('Codex CLI not available'))
-    }
-    const proc = spawn(codexPath, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env },
-      ...(dispatchCwd ? { cwd: dispatchCwd } : {}),
+  const codexPath = getCodexCliBinaryPath()
+  if (!codexPath) throw new Error('Codex CLI not available')
+  try {
+    const stdout = await runCliProcess(codexPath, args, {
+      input: fullPrompt, cwd: dispatchCwd || undefined, env: { ...process.env },
+      timeoutMs: 300_000, maxOutputBytes: CLAUDE_CLI_MAX_OUTPUT_BYTES,
+      shouldContinue: () => isTaskRunCurrent(task),
     })
-    let stdout = ''
-    let stderr = ''
-    const timeoutMs = 300_000
-    const timer = setTimeout(() => {
-      proc.kill('SIGTERM')
-      reject(new Error(`Codex CLI timed out after ${timeoutMs / 1000}s`))
-    }, timeoutMs)
+    let text: string | null = null
+    try {
+      if (statSync(outPath).size > CLAUDE_CLI_MAX_OUTPUT_BYTES) throw new Error('Codex result output exceeded limit')
+      text = (readFileSync(outPath, 'utf8') as string).trim() || null
+    } catch (err: any) { if (err.code !== 'ENOENT') throw err }
+    return { text: text || stdout.trim() || null, sessionId: null }
+  } finally {
+    try { rmSync(outPath, { force: true }) } catch { /* cleanup is best effort */ }
+  }
 
-    proc.stdout.on('data', (d) => { stdout += d.toString() })
-    proc.stderr.on('data', (d) => { stderr += d.toString() })
-    proc.on('error', (err) => { clearTimeout(timer); reject(err) })
-    proc.on('close', (code) => {
-      clearTimeout(timer)
-      let text: string | null = null
-      try { text = (readFileSync(outPath, 'utf8') as string).trim() || null } catch { /* no output file written */ }
-      try { rmSync(outPath, { force: true }) } catch { /* ignore */ }
-      if (code !== 0 && !text) {
-        return reject(new Error(`codex CLI exited ${code}: ${(stderr || stdout).slice(0, 500)}`))
-      }
-      resolve({ text: text || stdout.trim() || null, sessionId: null })
-    })
-
-    proc.stdin.write(fullPrompt)
-    proc.stdin.end()
-  })
 }
 
 async function callLocalDirectly(task: DispatchableTask, prompt: string, model: string): Promise<AgentResponseParsed> {
@@ -1478,8 +1424,9 @@ export async function runAegisReviews(): Promise<{ ok: boolean; message: string 
 
   for (const task of tasks) {
     // Move to quality_review to prevent re-processing
-    db.prepare('UPDATE tasks SET status = ?, updated_at = ? WHERE id = ? AND workspace_id = ?')
+    const claim = db.prepare("UPDATE tasks SET status = ?, updated_at = ? WHERE id = ? AND workspace_id = ? AND status = 'review'")
       .run('quality_review', Math.floor(Date.now() / 1000), task.id, task.workspace_id)
+    if (!claim.changes) continue
 
     eventBus.broadcast('task.status_changed', {
       id: task.id,
@@ -1498,7 +1445,7 @@ export async function runAegisReviews(): Promise<{ ok: boolean; message: string 
         // overrides and routes to the matching provider.
         const reviewTask: DispatchableTask = {
           id: task.id, title: task.title, description: task.description,
-          status: 'quality_review', priority: 'high', assigned_to: 'aegis',
+          status: 'quality_review', priority: 'high', assigned_to: task.assigned_to || '',
           workspace_id: task.workspace_id, agent_name: 'aegis', agent_id: 0,
           agent_config: task.agent_config, ticket_prefix: task.ticket_prefix,
           project_ticket_no: task.project_ticket_no, project_id: null,
@@ -1525,6 +1472,7 @@ export async function runAegisReviews(): Promise<{ ok: boolean; message: string 
         )
       }
 
+      if (!isTaskRunCurrent({ ...task, status: 'quality_review', assigned_to: task.assigned_to || '' })) continue
       if (!agentResponse.text) {
         throw new Error('Aegis review returned empty response')
       }
@@ -1605,16 +1553,20 @@ export async function runAegisReviews(): Promise<{ ok: boolean; message: string 
       results.push({ id: task.id, verdict: verdict.status })
       logger.info({ taskId: task.id, verdict: verdict.status }, 'Aegis review completed')
     } catch (err: any) {
+      if (!isTaskRunCurrent({ ...task, status: 'quality_review', assigned_to: task.assigned_to || '' })) continue
       const errorMsg = err.message || 'Unknown error'
       logger.error({ taskId: task.id, err }, 'Aegis review failed')
 
-      // Revert to review so it can be retried
-      db.prepare('UPDATE tasks SET status = ?, updated_at = ? WHERE id = ? AND workspace_id = ?')
-        .run('review', Math.floor(Date.now() / 1000), task.id, task.workspace_id)
+      // Transport failures must be bounded too, not retried every minute forever.
+      const attempts = (db.prepare('SELECT dispatch_attempts FROM tasks WHERE id = ? AND workspace_id = ?')
+        .get(task.id, task.workspace_id) as { dispatch_attempts: number } | undefined)?.dispatch_attempts ?? 0
+      const nextStatus = attempts + 1 >= 3 ? 'failed' : 'review'
+      db.prepare('UPDATE tasks SET status = ?, dispatch_attempts = ?, error_message = ?, updated_at = ? WHERE id = ? AND workspace_id = ?')
+        .run(nextStatus, attempts + 1, 'Quality review failed; check reviewer configuration before retrying', Math.floor(Date.now() / 1000), task.id, task.workspace_id)
 
       eventBus.broadcast('task.status_changed', {
         id: task.id,
-        status: 'review',
+        status: nextStatus,
         previous_status: 'quality_review',
         workspace_id: task.workspace_id,
       })
@@ -1960,6 +1912,8 @@ export async function dispatchAssignedTasks(): Promise<{ ok: boolean; message: s
         continue
       } // end else (new session dispatch)
 
+      if (!isTaskRunCurrent(task)) continue
+
       if (!agentResponse.text) {
         throw new Error('Agent returned empty response')
       }
@@ -2027,6 +1981,7 @@ export async function dispatchAssignedTasks(): Promise<{ ok: boolean; message: s
       results.push({ id: task.id, success: true })
       logger.info({ taskId: task.id, agent: task.agent_name }, 'Task dispatched and completed')
     } catch (err: any) {
+      if (!isTaskRunCurrent(task)) continue
       const errorMsg = err.message || 'Unknown error'
       logger.error({ taskId: task.id, agent: task.agent_name, err }, 'Task dispatch failed')
 

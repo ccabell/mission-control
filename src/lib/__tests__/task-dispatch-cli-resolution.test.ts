@@ -68,12 +68,12 @@ describe('spawn uses resolved path (#933 regression)', () => {
 
     // Verify spawn uses the resolved path
     expect(source).toContain('const claudePath = getClaudeCliBinaryPath()')
-    expect(source).toContain('spawn(claudePath, args')
+    expect(source).toContain('runCliProcess(claudePath, args')
 
     // Verify same pattern for codex
     expect(source).toContain('function getCodexCliBinaryPath()')
     expect(source).toContain('const codexPath = getCodexCliBinaryPath()')
-    expect(source).toContain('spawn(codexPath, args')
+    expect(source).toContain('runCliProcess(codexPath, args')
   })
 
   it('verifies availability check uses the same resolution logic', () => {

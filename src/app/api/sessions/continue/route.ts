@@ -6,6 +6,7 @@ import { requireRole } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { denyUnscopedResourceForStrictWorkspace } from '@/lib/workspace-isolation'
 import { runCommand } from '@/lib/command'
+import { runCliProcess } from '@/lib/cli-process'
 import { getOpenCodeExecutable } from '@/lib/opencode-sessions'
 
 /**
@@ -17,15 +18,16 @@ import { getOpenCodeExecutable } from '@/lib/opencode-sessions'
  * absolute path eliminates the ambiguity. Falls back to bare name.
  */
 async function resolveExecutable(name: string): Promise<string> {
-  if (name.includes('/')) return name
+  if (path.isAbsolute(name)) return name
   const candidates = [
-    process.env.CLAUDE_BIN,
+    ...(name === 'claude' && process.env.CLAUDE_BIN ? [process.env.CLAUDE_BIN] : []),
+    ...(process.platform === 'win32' ? [path.join(os.homedir(), '.local', 'bin', `${name}.exe`)] : []),
     `/home/nextjs/.local/bin/${name}`,
     `/usr/local/bin/${name}`,
     `/usr/bin/${name}`,
-  ].filter((p): p is string => !!p && p.endsWith(`/${name}`))
-  const pathDirs = (process.env.PATH || '').split(':').filter(Boolean)
-  for (const dir of pathDirs) candidates.push(path.join(dir, name))
+  ].filter((p): p is string => !!p)
+  const pathDirs = (process.env.PATH || '').split(path.delimiter).filter(Boolean)
+  for (const dir of pathDirs) candidates.push(path.join(dir, process.platform === 'win32' ? `${name}.exe` : name))
   for (const candidate of candidates) {
     try {
       await fs.access(candidate, fsConstants.X_OK)
@@ -126,11 +128,6 @@ function sanitizePrompt(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-/** Single-quote a string for safe inclusion in `sh -c "..."`. */
-function shQuote(s: string): string {
-  return `'${s.replace(/'/g, "'\\''")}'`
-}
-
 /** Best-effort mtime check on a session jsonl in any candidate project dir. */
 async function getSessionJsonlMtime(sessionId: string): Promise<number | null> {
   const home = os.homedir()
@@ -210,34 +207,13 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Use a shell wrapper instead of direct spawn. Next.js standalone server
-      // observed `spawn ENOENT` even when the absolute path resolves and is
-      // executable from `docker exec node -e`. Routing through `sh -c` works
-      // around the issue and keeps argv quoting safe via stdin-fed prompt.
-      const runViaShell = async (resume: boolean) => {
-        const args = ['--print']
-        if (resume) args.push('--resume', sessionId)
-        // Read prompt from stdin (`-`) to avoid shell quoting issues with
-        // arbitrary user input (newlines, quotes, special chars).
-        const cmd = `cd ${shQuote(sessionCwd || '/')} && exec ${shQuote(claudeBin)} ${args.map(shQuote).join(' ')}`
-        return runCommand('sh', ['-c', cmd], {
-          timeoutMs: 180000,
-          input: prompt,
-        })
-      }
-
-      let result: { stdout: string; stderr: string; code: number | null }
-      try {
-        result = await runViaShell(true)
-      } catch (err: any) {
-        const stderrText = String(err?.stderr || err?.message || '')
-        const resumeFailed =
-          /no conversation found|session.*not found|unknown session/i.test(stderrText)
-        if (!resumeFailed) throw err
-        logger.warn({ sessionId, sessionCwd, claudeBin }, 'claude --resume failed, retrying as fresh session')
-        result = await runViaShell(false)
-      }
-      reply = (result.stdout || '').trim() || (result.stderr || '').trim()
+      // Keep the owned run addressable by the existing terminate control.
+      // A missing session must fail rather than silently start a different conversation.
+      reply = (await runCliProcess(claudeBin, ['--print', '--resume', sessionId], {
+        input: prompt, cwd: sessionCwd || undefined, env: { ...process.env },
+        timeoutMs: 180000, maxOutputBytes: 1_000_000,
+        runKey: `${auth.user.workspace_id}:${sessionId}`,
+      })).trim()
 
       // Mode `nudge`: bump jsonl mtime so a tail-following host CLI is more
       // likely to notice fresh entries. Best-effort; no fatal on failure.
@@ -260,26 +236,18 @@ export async function POST(request: NextRequest) {
         }
       }
     } else if (kind === 'codex-cli') {
-      const outputPath = path.join('/tmp', `mc-codex-last-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`)
+      const outputPath = path.join(os.tmpdir(), `mc-codex-last-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`)
       try {
-        await runCommand('codex', ['exec', 'resume', sessionId, prompt, '--skip-git-repo-check', '-o', outputPath], {
-          timeoutMs: 180000,
+        await runCliProcess(await resolveExecutable('codex'), ['exec', 'resume', sessionId, '-', '--skip-git-repo-check', '-o', outputPath], {
+          input: prompt, timeoutMs: 180000, maxOutputBytes: 1_000_000,
+          runKey: `${auth.user.workspace_id}:${sessionId}`,
         })
-      } finally {
-        // Read after run attempt either way for best-effort output
-      }
-
-      try {
+        if ((await fs.stat(outputPath)).size > 1_000_000) throw new Error('Codex result output exceeded limit')
         reply = (await fs.readFile(outputPath, 'utf-8')).trim()
-      } catch {
-        reply = ''
+      } finally {
+        try { await fs.unlink(outputPath) } catch { /* no output file */ }
       }
 
-      try {
-        await fs.unlink(outputPath)
-      } catch {
-        // ignore
-      }
     } else {
       const result = await runCommand(getOpenCodeExecutable(), ['run', '--session', sessionId, prompt], {
         timeoutMs: 180000,
