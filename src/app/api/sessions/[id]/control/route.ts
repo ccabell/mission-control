@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth'
 import { callOpenClawGateway } from '@/lib/openclaw-gateway'
+import { stopCliRun } from '@/lib/cli-process'
 import { db_helpers } from '@/lib/db'
 import { mutationLimiter } from '@/lib/rate-limit'
 import { logger } from '@/lib/logger'
@@ -41,7 +42,9 @@ export async function POST(
 
     let result: unknown
     if (action === 'terminate') {
-      result = await callOpenClawGateway('sessions_kill', { sessionKey: id }, 10_000)
+      const stopped = await stopCliRun(`${auth.user.workspace_id}:${id}`)
+      result = stopped ? { stopped: true, source: 'local' }
+        : await callOpenClawGateway('sessions_kill', { sessionKey: id }, 10_000)
     } else {
       const message = action === 'monitor'
         ? { type: 'control', action: 'monitor' }

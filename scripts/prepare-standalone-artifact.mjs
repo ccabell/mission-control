@@ -1,4 +1,4 @@
-import { access, mkdir, readdir, rm } from 'node:fs/promises'
+import { access, cp, mkdir, readdir, rm } from 'node:fs/promises'
 import path from 'node:path'
 
 const root = path.resolve('.next/standalone')
@@ -22,6 +22,11 @@ await access(path.join(root, 'server.js')).catch(() => {
 await access(schemaPath).catch(() => {
   throw new Error('Standalone artifact is missing the runtime database schema')
 })
+
+// Next standalone tracing omits browser assets. Package them here so every
+// launcher receives a complete application, including native Windows launchers.
+await cp(path.resolve('.next/static'), path.join(root, '.next/static'), { recursive: true })
+await cp(path.resolve('public'), path.join(root, 'public'), { recursive: true })
 
 for (const entry of await readdir(root)) {
   if (!allowedRoots.has(entry)) await rm(path.join(root, entry), { recursive: true, force: true })

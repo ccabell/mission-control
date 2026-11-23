@@ -7,6 +7,7 @@ const requiredFiles = [
   'openapi.json',
   'ops/templates/openclaw-gateway@.service',
   'src/lib/schema.sql',
+  'public/brand/mc-logo-128.png',
 ]
 const allowedRoots = new Set([
   '.next',
@@ -48,6 +49,12 @@ const entries = await readdir(root)
 // surfaces that could leak repository files are checked recursively below.
 const files = await walk(root, '', new Set(['node_modules', '.next']))
 const failures = []
+const browserFiles = await walk(path.join(root, '.next/static')).catch(() => [])
+for (const extension of ['.js', '.css']) {
+  if (!browserFiles.some(file => file.endsWith(extension))) {
+    failures.push(`missing browser assets: .next/static/*${extension}`)
+  }
+}
 
 for (const required of requiredFiles) {
   await access(path.join(root, required)).catch(() => {

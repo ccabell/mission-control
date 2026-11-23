@@ -25,7 +25,10 @@ export interface CodexSessionStats {
 interface ParsedFile {
   path: string
   mtimeMs: number
+  size: number
 }
+
+const sessionCache = new Map<string, { mtimeMs: number; size: number; session: CodexSessionStats | null }>()
 
 function asObject(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
@@ -77,7 +80,7 @@ function listRecentCodexSessionFiles(limit: number): ParsedFile[] {
       }
 
       if (!stat.isFile() || !fullPath.endsWith('.jsonl')) continue
-      files.push({ path: fullPath, mtimeMs: stat.mtimeMs })
+      files.push({ path: fullPath, mtimeMs: stat.mtimeMs, size: stat.size })
     }
   }
 
@@ -212,10 +215,20 @@ export function scanCodexSessions(limit = DEFAULT_FILE_SCAN_LIMIT): CodexSession
   try {
     const files = listRecentCodexSessionFiles(limit)
     const sessions: CodexSessionStats[] = []
+    const selected = new Set(files.map(file => file.path))
+    for (const key of sessionCache.keys()) {
+      if (!selected.has(key)) sessionCache.delete(key)
+    }
 
     for (const file of files) {
-      const parsed = parseCodexSessionFile(file.path, file.mtimeMs)
-      if (parsed) sessions.push(parsed)
+      const cached = sessionCache.get(file.path)
+      const parsed = cached?.mtimeMs === file.mtimeMs && cached.size === file.size
+        ? cached.session : parseCodexSessionFile(file.path, file.mtimeMs)
+      sessionCache.set(file.path, { mtimeMs: file.mtimeMs, size: file.size, session: parsed })
+      if (parsed) {
+        const lastMs = parsed.lastMessageAt ? new Date(parsed.lastMessageAt).getTime() : 0
+        sessions.push({ ...parsed, isActive: lastMs > 0 && Date.now() - lastMs < ACTIVE_THRESHOLD_MS })
+      }
     }
 
     sessions.sort((a, b) => {

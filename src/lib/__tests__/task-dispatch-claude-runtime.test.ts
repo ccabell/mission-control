@@ -18,6 +18,12 @@ function sliceBetween(start: string, end: string): string {
 }
 
 describe('claude runtime dispatch routing (#602)', () => {
+  it('routes explicit Codex runtime before gateway/direct selection without fallback', () => {
+    const branch = sliceBetween("} else if (String(task.agent_runtime_type || '').toLowerCase() === 'codex')", '} else if (useDirectApi')
+    expect(branch).toContain('await callCodexViaCli(task, prompt,')
+    expect(branch).not.toContain('callOpenClawGateway')
+    expect(branch).not.toContain('callDirectly(')
+  })
   it('selects agent_runtime_type in the dispatch query', () => {
     const dispatchLoop = sliceBetween('export async function dispatchAssignedTasks()', '// Auto-routing:')
     expect(dispatchLoop).toContain('a.runtime_type as agent_runtime_type')
@@ -53,6 +59,8 @@ describe('claude runtime dispatch routing (#602)', () => {
   it('bounds claude CLI output', () => {
     const fn = sliceBetween('const CLAUDE_CLI_MAX_OUTPUT_BYTES', 'async function dispatchViaClaudeSession(')
     expect(fn).toContain('CLAUDE_CLI_MAX_OUTPUT_BYTES = 1_000_000')
-    expect(fn).toContain('output exceeded')
+    // Enforcement is now shared with Codex; cli-process.test.ts exercises the real limit.
+    expect(fn).toContain('runCliProcess(claudePath, args, {')
+    expect(fn).toContain('maxOutputBytes: CLAUDE_CLI_MAX_OUTPUT_BYTES')
   })
 })
