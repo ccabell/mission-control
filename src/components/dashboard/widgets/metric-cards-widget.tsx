@@ -1,5 +1,7 @@
 'use client'
 
+import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
+
 import {
   MetricCard,
   SessionIcon,
@@ -56,12 +58,13 @@ export function MetricCardsWidget({ data }: { data: DashboardData }) {
         />
         <MetricCard
           label="Codex"
-          value={isSessionsLoading ? '...' : codexActive}
+          value={isSessionsLoading ? '...' : A360_OBSERVATION_MODE ? 'Unknown' : codexActive}
           total={isSessionsLoading ? undefined : codexLocalSessions.length}
-          subtitle="active sessions"
+          subtitle={A360_OBSERVATION_MODE ? "registered lanes; activity unknown" : "active sessions"}
           icon={<SessionIcon />}
           color="green"
         />
+        {!A360_OBSERVATION_MODE && (
         <MetricCard
           label="Hermes"
           value={isSessionsLoading ? '...' : hermesActive}
@@ -70,6 +73,7 @@ export function MetricCardsWidget({ data }: { data: DashboardData }) {
           icon={<SessionIcon />}
           color="purple"
         />
+        )}
         <MetricCard
           label="System Load"
           value={isSystemLoading ? '...' : `${systemLoad}%`}

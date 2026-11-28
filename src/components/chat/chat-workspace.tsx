@@ -250,6 +250,13 @@ export function ChatWorkspace({ mode = 'embedded', onClose }: ChatWorkspaceProps
       return
     }
 
+    if (sessionMeta.sessionId.startsWith('registered-')) {
+      setSessionTranscript([])
+      setSessionTranscriptLoading(false)
+      setSessionTranscriptError('Registered Codex lane only. Transcript is not synced; use the original Codex chat. Live activity is unknown. Original chat: ' + sessionMeta.sessionId.slice(11))
+      return
+    }
+
     let cancelled = false
     setSessionTranscriptLoading(true)
     setSessionTranscriptError(null)

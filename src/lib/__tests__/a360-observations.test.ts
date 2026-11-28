@@ -3,7 +3,7 @@ import Database from 'better-sqlite3'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ingestObservation, readObservation, validateObservation } from '../a360-observations'
+import { ingestObservation, readObservation, validateObservation, registeredCodexSessions } from '../a360-observations'
 
 describe('A360 relay observations', () => {
   let directory: string
@@ -18,6 +18,16 @@ describe('A360 relay observations', () => {
     db.exec('CREATE TABLE activities (id INTEGER PRIMARY KEY, type TEXT, entity_type TEXT, entity_id INTEGER, actor TEXT, description TEXT, data TEXT, created_at INTEGER, workspace_id INTEGER)')
   })
   afterEach(() => { db.close(); rmSync(directory, { recursive: true }) })
+  it('shows Codex identities without treating registry membership or fresh snapshots as live activity', () => {
+    const snapshot = validateObservation(payload(), now)
+    snapshot.lanes.push({ name: 'claude-only', client: 'claude', session_id: 'other-id' })
+    snapshot.lanes.push({ name: 'missing-chat', client: 'codex', session_id: null })
+    const sessions = registeredCodexSessions(snapshot)
+    expect(sessions).toHaveLength(1)
+    expect(sessions[0]).toMatchObject({ id: 'registered-synthetic-chat-id', key: 'test-lane', active: false, lastActivity: 0, source: 'relay-registration' })
+    expect(sessions[0].lastUserPrompt).toContain('transcript not synced')
+    expect(registeredCodexSessions(null)).toEqual([])
+  })
   it('preserves actual event time, deduplicates across requests and scopes both data and dedup to workspace', () => {
     const snapshot = validateObservation(payload(), now)
     expect(ingestObservation(db, directory, 1, snapshot)).toHaveLength(1)

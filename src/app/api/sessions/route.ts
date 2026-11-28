@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
+import { config } from '@/lib/config'
+import { readObservation, registeredCodexSessions } from '@/lib/a360-observations'
 import { getAllGatewaySessions } from '@/lib/sessions'
 import { syncClaudeSessions } from '@/lib/claude-sessions'
 import { scanCodexSessions } from '@/lib/codex-sessions'
@@ -31,8 +33,11 @@ export async function GET(request: NextRequest) {
     // Serve the latest database snapshot while the shared disk refresh runs.
     void syncClaudeSessions().catch(error => logger.error({ err: error }, 'Background session sync failed'))
     const claudeSessions = getLocalClaudeSessions()
-    const codexSessions = getLocalCodexSessions()
-    const hermesSessions = getLocalHermesSessions()
+    const scannedCodex = getLocalCodexSessions()
+    const codexSessions = A360_OBSERVATION_MODE && scannedCodex.length === 0
+      ? registeredCodexSessions(readObservation(config.dataDir, auth.user.workspace_id ?? 1).snapshot)
+      : scannedCodex
+    const hermesSessions = A360_OBSERVATION_MODE ? [] : getLocalHermesSessions()
     const opencodeSessions = getLocalOpenCodeSessions()
     const localMerged = mergeLocalSessions(claudeSessions, codexSessions, hermesSessions, opencodeSessions)
 
@@ -386,9 +391,11 @@ function dedupeAndSortSessions(merged: Array<Record<string, any>>) {
     if (!existing || currentActivity > existingActivity) deduped.set(key, session)
   }
 
-  return Array.from(deduped.values())
+  const sorted = Array.from(deduped.values())
     .sort((a, b) => Number(b?.lastActivity || 0) - Number(a?.lastActivity || 0))
-    .slice(0, 100)
+  // An older registered Codex lane must not disappear behind Claude's history cap.
+  return [...sorted.filter(s => s.source !== 'relay-registration').slice(0, 100),
+    ...sorted.filter(s => s.source === 'relay-registration')]
 }
 
 function formatTokens(n: number): string {

@@ -1,5 +1,7 @@
 'use client'
 
+import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
+
 import type { DashboardData } from '../widget-primitives'
 
 /** Simple SVG sparkline from an array of numbers */
@@ -139,7 +141,7 @@ export function FleetStatusWidget({ data }: { data: DashboardData }) {
         <h3 className="text-sm font-semibold">Fleet Status</h3>
       </div>
       <div className="divide-y divide-border/30">
-        {rows.map((row) => {
+        {rows.filter(row => !A360_OBSERVATION_MODE || row.name !== 'Hermes').map((row) => {
           const sparkData = getSessionSparkline(row.sessions)
           const isGateway = row.name === 'Gateway'
 
@@ -166,7 +168,7 @@ export function FleetStatusWidget({ data }: { data: DashboardData }) {
                 ) : isLoading ? (
                   '...'
                 ) : (
-                  <>{row.active} active</>
+                  <>{A360_OBSERVATION_MODE && row.name === 'Codex' ? 'Unknown' : `${row.active} active`}</>
                 )}
               </span>
 
@@ -180,7 +182,7 @@ export function FleetStatusWidget({ data }: { data: DashboardData }) {
                 ) : isLoading ? (
                   ''
                 ) : (
-                  `${row.total} total`
+                  `${row.total} ${A360_OBSERVATION_MODE && row.name === 'Codex' ? 'listed' : 'total'}`
                 )}
               </span>
 

@@ -22,6 +22,17 @@ export const observationSchema = z.object({
 }).strict()
 export type Observation = z.infer<typeof observationSchema>
 
+// Registration proves identity only, never liveness or transcript availability.
+export function registeredCodexSessions(snapshot: Observation | null) {
+  return (snapshot?.lanes ?? []).filter(lane => lane.client === 'codex' && lane.session_id).map(lane => ({
+    id: `registered-${lane.session_id}`, key: lane.name, agent: lane.name,
+    kind: 'codex-cli', source: 'relay-registration', channel: 'windows-primary',
+    age: 'unknown', model: 'unknown', tokens: 'unknown', flags: [], active: false,
+    startTime: 0, lastActivity: 0, workingDir: null,
+    lastUserPrompt: 'Registered lane only — activity unknown; transcript not synced. Original chat: ' + lane.session_id,
+  }))
+}
+
 export function validateObservation(input: unknown, now = Date.now()): Observation {
   const snapshot = observationSchema.parse(input)
   const generated = Date.parse(snapshot.generated)
