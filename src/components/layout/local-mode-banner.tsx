@@ -1,5 +1,7 @@
 'use client'
 
+import { apiFetch } from '@/lib/api-client'
+import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useMissionControl } from '@/store'
 import { useNavigateToPanel } from '@/lib/navigation'
@@ -9,6 +11,18 @@ import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
 export function LocalModeBanner() {
   const { dashboardMode, bannerDismissed, capabilitiesChecked, dismissBanner } = useMissionControl()
   const navigateToPanel = useNavigateToPanel()
+  const [feeds, setFeeds] = useState<Array<{client: string; checked: string | null; status: string}>>([])
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    if (!A360_OBSERVATION_MODE) return
+    let cancelled = false
+    const refresh = async () => {
+      setNow(Date.now())
+      try { const data = await apiFetch<{snapshot?: {sources?: Array<{client: string; checked: string | null; status: string}>}}>('/api/a360/observations'); if (!cancelled) setFeeds(data.snapshot?.sources ?? []) } catch { if (!cancelled) setFeeds([]) }
+    }
+    void refresh(); const timer = setInterval(refresh, 60000)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [])
   const t = useTranslations('localModeBanner')
   const tc = useTranslations('common')
 
@@ -17,6 +31,8 @@ export function LocalModeBanner() {
   if (A360_OBSERVATION_MODE) return (
     <div className="mx-4 mt-3 px-4 py-2.5 text-xs text-muted-foreground border-b border-border" role="note">
       <span className="font-medium text-foreground">A360 observation mode. </span>
+      {feeds.length === 0 && <span>Metadata feed not verified. </span>}
+      {feeds.map(feed => { const stale = !feed.checked || now - Date.parse(feed.checked) > 300000 || feed.status !== 'read'; return <span key={feed.client} className={stale ? 'text-destructive' : ''}>{feed.client === 'codex' ? 'Codex' : 'Claude'}: {stale ? 'Stale / unavailable' : 'checked ' + new Date(feed.checked!).toLocaleString()}. </span> })}
       Chats show saved session history, not a live connection to the original chat. Activity shows relay updates and their freshness. Send requests in your original Claude or Codex chat.
     </div>
   )

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
 import { config } from '@/lib/config'
-import { readObservation, registeredCodexSessions } from '@/lib/a360-observations'
+import { readObservation, observedCodexSessions } from '@/lib/a360-observations'
 import { getAllGatewaySessions } from '@/lib/sessions'
 import { syncClaudeSessions } from '@/lib/claude-sessions'
 import { scanCodexSessions } from '@/lib/codex-sessions'
@@ -32,10 +32,14 @@ export async function GET(request: NextRequest) {
     // Always include local sessions alongside gateway sessions
     // Serve the latest database snapshot while the shared disk refresh runs.
     void syncClaudeSessions().catch(error => logger.error({ err: error }, 'Background session sync failed'))
-    const claudeSessions = getLocalClaudeSessions()
+    const snapshot = A360_OBSERVATION_MODE ? readObservation(config.dataDir, auth.user.workspace_id ?? 1).snapshot : null
+    const claudeSessions = getLocalClaudeSessions().map(session => {
+      const metadata = snapshot?.sessions?.find(row => row.client === 'claude' && row.id === session.id)
+      return metadata ? {...session, lastActivity: Date.parse(metadata.updated), age: 'file updated ' + new Date(metadata.updated).toLocaleString(), active:false} : session
+    })
     const scannedCodex = getLocalCodexSessions()
     const codexSessions = A360_OBSERVATION_MODE && scannedCodex.length === 0
-      ? registeredCodexSessions(readObservation(config.dataDir, auth.user.workspace_id ?? 1).snapshot)
+      ? observedCodexSessions(snapshot)
       : scannedCodex
     const hermesSessions = A360_OBSERVATION_MODE ? [] : getLocalHermesSessions()
     const opencodeSessions = getLocalOpenCodeSessions()
@@ -394,7 +398,7 @@ function dedupeAndSortSessions(merged: Array<Record<string, any>>) {
   const sorted = Array.from(deduped.values())
     .sort((a, b) => Number(b?.lastActivity || 0) - Number(a?.lastActivity || 0))
   // An older registered Codex lane must not disappear behind Claude's history cap.
-  return [...sorted.filter(s => s.source !== 'relay-registration').slice(0, 100),
+  return [...sorted.filter(s => s.source !== 'relay-registration').slice(0, 200),
     ...sorted.filter(s => s.source === 'relay-registration')]
 }
 

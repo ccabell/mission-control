@@ -15,6 +15,8 @@ export const observationSchema = z.object({
     name, client: z.enum(['claude', 'codex', 'kiro', 'unknown']),
     session_id: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/).nullable(),
   }).strict()).max(500),
+  sessions: z.array(z.object({ id: name, title: z.string().max(200), client: z.enum(['claude', 'codex']), updated: date }).strict()).max(200).optional(),
+  sources: z.array(z.object({ client: z.enum(['claude', 'codex']), checked: date.nullable(), status: z.enum(['read', 'unavailable']) }).strict()).max(2).optional(),
   events: z.array(z.object({
     message_id: z.string().regex(/^M-[0-9]{8}-[0-9]{6}-[a-f0-9]+$/),
     from: name, to: name, status, at: date,
@@ -38,6 +40,7 @@ export function validateObservation(input: unknown, now = Date.now()): Observati
   const generated = Date.parse(snapshot.generated)
   if (generated > now + 60000 || now - generated > 300000) throw Error('Observation must be generated within five minutes')
   if (snapshot.events.some(event => Date.parse(event.at) > generated + 60000)) throw Error('Observation contains a future event')
+  if (snapshot.sessions?.some(session => Date.parse(session.updated) > generated + 60000)) throw Error('Future chat update')
   return snapshot
 }
 
@@ -77,4 +80,17 @@ export function ingestObservation(db: Database.Database, directory: string, work
     }
     return added
   })()
+}
+
+// A chat-file update is metadata evidence, never runtime liveness.
+export function observedCodexSessions(snapshot: Observation | null) {
+  const synced = (snapshot?.sessions ?? []).filter(s => s.client === 'codex')
+  const ids = new Set(synced.map(s => s.id))
+  return [...synced.map(s => ({
+    id: `metadata-${s.id}`, key: s.title, agent: 'Codex', kind: 'codex-cli',
+    source: 'host-metadata', channel: 'windows-primary', age: 'updated ' + new Date(s.updated).toLocaleString(),
+    model: 'unknown', tokens: 'unknown', flags: [], active: false, startTime: 0,
+    lastActivity: Date.parse(s.updated), workingDir: null,
+    lastUserPrompt: 'Metadata only; transcript not synced. Original chat: ' + s.id,
+  })), ...registeredCodexSessions(snapshot).filter(s => !ids.has(s.id.slice(11)))]
 }

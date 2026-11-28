@@ -250,10 +250,10 @@ export function ChatWorkspace({ mode = 'embedded', onClose }: ChatWorkspaceProps
       return
     }
 
-    if (sessionMeta.sessionId.startsWith('registered-')) {
+    if ((/^(registered|metadata)-/).test(sessionMeta.sessionId)) {
       setSessionTranscript([])
       setSessionTranscriptLoading(false)
-      setSessionTranscriptError('Registered Codex lane only. Transcript is not synced; use the original Codex chat. Live activity is unknown. Original chat: ' + sessionMeta.sessionId.slice(11))
+      setSessionTranscriptError('Codex metadata only. Transcript is not synced; use the original Codex chat. This does not prove the agent is running. Original chat: ' + sessionMeta.sessionId.replace(/^(registered|metadata)-/, ''))
       return
     }
 
@@ -557,7 +557,7 @@ function SessionConversationView({
   onSavePreferences: (payload: { prefKey: string; displayName?: string; colorTag?: string }) => Promise<void>
 }) {
   const isGatewaySession = session.sessionKind === 'gateway'
-  const isPtyCapableKind = !session.sessionId.startsWith('registered-') && (session.sessionKind === 'claude-code' || session.sessionKind === 'codex-cli')
+  const isPtyCapableKind = !(/^(registered|metadata)-/).test(session.sessionId) && (session.sessionKind === 'claude-code' || session.sessionKind === 'codex-cli')
   const [viewMode, setViewMode] = useState<'terminal' | 'transcript'>('transcript')
   const prevSessionIdRef = useRef(session.sessionId)
   const transcriptScrollRef = useRef<HTMLDivElement | null>(null)
@@ -696,7 +696,7 @@ function SessionConversationView({
             />
           )}
           <span className={`rounded-full px-2 py-0.5 text-[10px] ${session.active ? 'bg-green-500/20 text-green-300' : 'bg-muted text-muted-foreground'}`}>
-            {session.sessionId.startsWith('registered-') ? 'activity unknown' : session.active ? 'active' : 'idle'}
+            {(/^(registered|metadata)-/).test(session.sessionId) ? 'runtime unknown' : session.active ? 'active' : 'idle'}
           </span>
           <span className="font-mono-tight">{getSessionKindLabel(session.sessionKind)}</span>
           {session.model && <span className="text-muted-foreground/60">{session.model}</span>}

@@ -3,7 +3,7 @@ import Database from 'better-sqlite3'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ingestObservation, readObservation, validateObservation, registeredCodexSessions } from '../a360-observations'
+import { ingestObservation, readObservation, validateObservation, registeredCodexSessions, observedCodexSessions } from '../a360-observations'
 
 describe('A360 relay observations', () => {
   let directory: string
@@ -27,6 +27,14 @@ describe('A360 relay observations', () => {
     expect(sessions[0]).toMatchObject({ id: 'registered-synthetic-chat-id', key: 'test-lane', active: false, lastActivity: 0, source: 'relay-registration' })
     expect(sessions[0].lastUserPrompt).toContain('transcript not synced')
     expect(registeredCodexSessions(null)).toEqual([])
+  })
+  it('keeps metadata dates and original identities without claiming liveness or duplicating registrations', () => {
+    const snapshot = validateObservation({...payload(), sessions:[{id:'synthetic-chat-id', title:'Synthetic chat', client:'codex', updated:new Date(now-600000).toISOString()}], sources:[{client:'codex', checked:new Date(now).toISOString(), status:'read'}]}, now)
+    const rows = observedCodexSessions(snapshot)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({id:'metadata-synthetic-chat-id', key:'Synthetic chat', active:false, lastActivity:now-600000})
+    expect(() => validateObservation({...snapshot, sessions:[{...snapshot.sessions![0], body:'private'}]},now)).toThrow()
+    expect(() => validateObservation({...snapshot, sessions:[{...snapshot.sessions![0], updated:new Date(now+61000).toISOString()}]},now)).toThrow()
   })
   it('preserves actual event time, deduplicates across requests and scopes both data and dedup to workspace', () => {
     const snapshot = validateObservation(payload(), now)

@@ -286,7 +286,7 @@ export function ConversationList({ onNewConversation }: ConversationListProps) {
                 : 'Gateway'
           const prefKey = `${sessionKind}:${s.id}`
           const pref = prefs[prefKey] || {}
-          const defaultName = s.source === 'local'
+          const defaultName = s.source === 'host-metadata' ? `Codex • ${s.key || s.id}` : s.source === 'local'
             ? `${kindLabel} • ${s.key || s.id}`
             : `${s.agent || 'Gateway'} • ${s.key || s.id}`
           const sessionName = pref.name || defaultName
