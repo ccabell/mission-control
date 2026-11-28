@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useCallback, useState, useRef } from 'react'
+import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
 import { useMissionControl, type Conversation, type ChatAttachment, type Agent, type ChatMessage } from '@/store'
 import { apiFetch, ApiError } from '@/lib/api-client'
 import { useSmartPoll } from '@/lib/use-smart-poll'
@@ -149,7 +150,7 @@ export function ChatWorkspace({ mode = 'embedded', onClose }: ChatWorkspaceProps
 
   // Send message handler with optimistic updates
   const handleSend = async (content: string, attachments?: ChatAttachment[]) => {
-    if (!activeConversation) return
+    if (A360_OBSERVATION_MODE || !activeConversation) return
 
     const mentionMatch = content.match(/^@(\w+)\s/)
     let to = mentionMatch ? mentionMatch[1] : null
@@ -237,6 +238,7 @@ export function ChatWorkspace({ mode = 'embedded', onClose }: ChatWorkspaceProps
   }
 
   const canSendMessage =
+    !A360_OBSERVATION_MODE &&
     !!activeConversation &&
     !activeConversation.startsWith('session:')
 
@@ -586,7 +588,7 @@ function SessionConversationView({
 
   const handleContinueSession = async () => {
     const prompt = continuePrompt.trim()
-    if (!prompt || continueBusy) return
+    if (A360_OBSERVATION_MODE || !prompt || continueBusy) return
 
     setContinueBusy(true)
     setContinueError(null)
@@ -818,6 +820,7 @@ function SessionConversationView({
           <span className={`font-mono-tight text-xs ${isGatewaySession ? 'text-cyan-400/60' : 'text-green-400/60'}`}>{isGatewaySession ? '>' : '$'}</span>
           <input
             value={continuePrompt}
+            disabled={A360_OBSERVATION_MODE}
             onChange={(e) => setContinuePrompt(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -825,14 +828,14 @@ function SessionConversationView({
                 void handleContinueSession()
               }
             }}
-            placeholder={isGatewaySession ? 'Send message to this agent session...' : 'Send prompt to this local session...'}
+            placeholder={A360_OBSERVATION_MODE ? 'Saved history — reply in the original chat' : isGatewaySession ? 'Send message to this agent session...' : 'Send prompt to this local session...'}
             className="h-7 flex-1 rounded border border-border/40 bg-surface-1 px-2 font-mono-tight text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-hidden focus:ring-1 focus:ring-primary/30"
           />
           <Button
             onClick={handleContinueSession}
             size="sm"
             variant="ghost"
-            disabled={continueBusy || !continuePrompt.trim()}
+            disabled={A360_OBSERVATION_MODE || continueBusy || !continuePrompt.trim()}
             className="h-7 px-3 text-xs"
           >
             {continueBusy ? '...' : 'Send'}

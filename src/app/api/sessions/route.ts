@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
 import { getAllGatewaySessions } from '@/lib/sessions'
 import { syncClaudeSessions } from '@/lib/claude-sessions'
 import { scanCodexSessions } from '@/lib/codex-sessions'
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
   if (isolationDenied) return isolationDenied
 
   try {
-    const gatewaySessions = getAllGatewaySessions()
+    const gatewaySessions = A360_OBSERVATION_MODE ? [] : getAllGatewaySessions()
     const mappedGatewaySessions = mapGatewaySessions(gatewaySessions)
 
     // Always include local sessions alongside gateway sessions

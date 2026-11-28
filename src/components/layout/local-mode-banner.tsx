@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import { useMissionControl } from '@/store'
 import { useNavigateToPanel } from '@/lib/navigation'
 import { Button } from '@/components/ui/button'
+import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
 
 export function LocalModeBanner() {
   const { dashboardMode, bannerDismissed, capabilitiesChecked, dismissBanner } = useMissionControl()
@@ -12,6 +13,13 @@ export function LocalModeBanner() {
   const tc = useTranslations('common')
 
   if (!capabilitiesChecked || dashboardMode === 'full' || bannerDismissed) return null
+
+  if (A360_OBSERVATION_MODE) return (
+    <div className="mx-4 mt-3 px-4 py-2.5 text-xs text-muted-foreground border-b border-border" role="note">
+      <span className="font-medium text-foreground">A360 observation mode. </span>
+      Chats show saved session history, not a live connection to the original chat. Activity shows relay updates and their freshness. Send requests in your original Claude or Codex chat.
+    </div>
+  )
 
   return (
     <div className="mx-4 mt-3 mb-0 flex items-center gap-3 px-4 py-2.5 rounded-lg bg-void-cyan/5 border border-void-cyan/15 text-sm">

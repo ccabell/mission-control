@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+const mode = vi.hoisted(() => ({ enabled: false }))
+vi.mock('@/lib/a360-mode', () => ({ get A360_OBSERVATION_MODE() { return mode.enabled } }))
 
 // Mocks must be set up before importing the route module.
 const requireRole = vi.fn()
@@ -33,6 +35,24 @@ const fakeFixRequest = () => new Request('http://localhost/api/openclaw/doctor',
   method: 'POST',
   headers: { 'content-type': 'application/json' },
   body: JSON.stringify({ confirmation: 'fix_openclaw' }),
+})
+
+describe('A360 observation deployment', () => {
+  afterEach(() => { mode.enabled = false; vi.clearAllMocks() })
+  it('does not spawn or repair OpenClaw, and keeps authentication required', async () => {
+    mode.enabled = true
+    vi.resetModules()
+    runOpenClaw.mockReset()
+    requireRole.mockReturnValue({ user: { id: 1, role: 'admin' } })
+    const route = await import('@/app/api/openclaw/doctor/route')
+    const response = await route.GET(fakeRequest())
+    expect(await response.json()).toMatchObject({ enabled: false })
+    expect((await route.POST(fakeFixRequest())).status).toBe(409)
+    expect(runOpenClaw).not.toHaveBeenCalled()
+    requireRole.mockReturnValue({ error: 'Unauthorized', status: 401 })
+    expect((await route.GET(fakeRequest())).status).toBe(401)
+    expect((await route.POST(fakeFixRequest())).status).toBe(401)
+  })
 })
 
 describe('GET /api/openclaw/doctor — single-flight + TTL cache (issue #613)', () => {
