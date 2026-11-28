@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Loader } from '@/components/ui/loader'
@@ -225,6 +225,7 @@ export function ActivityFeedPanel() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
   const [lastRefresh, setLastRefresh] = useState(Date.now())
+  const [relayFeed, setRelayFeed] = useState<{ status: string; snapshot: { generated: string; lanes: { name: string; client: string }[] } | null }>({ status: 'Checking source', snapshot: null })
 
   const [selectedAgent, setSelectedAgent] = useState<string>('')
   const [filter, setFilter] = useState({ type: '', limit: 50 })
@@ -249,6 +250,9 @@ export function ActivityFeedPanel() {
         const response = await fetch(`/api/activities?${params}`)
         if (!response.ok) throw new Error('Failed to fetch activities')
         const data = await response.json()
+        try {
+          setRelayFeed(await apiFetch<typeof relayFeed>('/api/a360/observations'))
+        } catch { setRelayFeed({ status: 'Source unavailable', snapshot: null }) }
 
         if (since && !isAgentView) {
           setActivities((prev) => {
@@ -272,20 +276,17 @@ export function ActivityFeedPanel() {
     [selectedAgent, filter.type, limit, page, isAgentView],
   )
 
-  const lastRefreshRef = useRef(lastRefresh)
-  useEffect(() => {
-    lastRefreshRef.current = lastRefresh
-  }, [lastRefresh])
-
   useEffect(() => {
     fetchActivities()
   }, [fetchActivities])
 
   const pollActivities = useCallback(() => {
-    fetchActivities(isAgentView ? undefined : lastRefreshRef.current)
-  }, [fetchActivities, isAgentView])
+    // Imported events retain their original times. An incremental query since
+    // the last browser refresh would silently miss later-arriving observations.
+    fetchActivities()
+  }, [fetchActivities])
 
-  useSmartPoll(pollActivities, 30000, { enabled: autoRefresh, pauseWhenSseConnected: true })
+  useSmartPoll(pollActivities, 30000, { enabled: autoRefresh })
 
   // ── Fetch sessions (for agent sidebar) ────────
   const fetchSessions = useCallback(async () => {
@@ -303,6 +304,7 @@ export function ActivityFeedPanel() {
 
   // ── Derived data ──────────────────────────────
   const activityTypes = Array.from(new Set(activities.map((a) => a.type))).sort()
+  const laneNames = Array.from(new Set([...agents.map(a => a.name), ...(relayFeed.snapshot?.lanes.map(lane => lane.name) || [])])).sort()
   const agentSessions = sessions.filter((s) => selectedAgent && s.key.includes(selectedAgent))
   const selectedAgentData = agents.find((a) => a.name === selectedAgent)
   const totalPages = Math.ceil(total / limit)
@@ -332,49 +334,23 @@ export function ActivityFeedPanel() {
         </div>
       </div>
 
+      <div role="status" className="px-4 py-2 text-sm text-muted-foreground border-b border-border">
+        A360 relay: {relayFeed.status}{relayFeed.snapshot ? ` · Updated ${new Date(relayFeed.snapshot.generated).toLocaleString()}` : ''}.
+        {' '}Observations only; relay completion does not prove task delivery or runtime control.
+      </div>
+
       {/* Filters + Agent Selector */}
       <div className="p-4 border-b border-border bg-surface-1 shrink-0">
         <div className="flex gap-4 flex-wrap items-end">
           {/* Agent filter */}
           <div>
-            <label className="block text-xs text-muted-foreground mb-1">{t('filterAgent')}</label>
-            <div className="flex gap-1 flex-wrap">
-              <Button
-                onClick={() => {
-                  setSelectedAgent('')
-                  setPage(0)
-                }}
-                variant={selectedAgent === '' ? 'default' : 'secondary'}
-                size="xs"
-              >
-                {t('filterAll')}
-              </Button>
-              {agents.map((a) => (
-                <Button
-                  key={a.name}
-                  onClick={() => {
-                    setSelectedAgent(a.name)
-                    setPage(0)
-                  }}
-                  variant={selectedAgent === a.name ? 'default' : 'secondary'}
-                  size="xs"
-                  className="flex items-center gap-1"
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      a.status === 'busy'
-                        ? 'bg-green-500'
-                        : a.status === 'idle'
-                          ? 'bg-yellow-500'
-                          : a.status === 'error'
-                            ? 'bg-red-500'
-                            : 'bg-muted-foreground/30'
-                    }`}
-                  />
-                  {a.name}
-                </Button>
-              ))}
-            </div>
+            <label htmlFor="activity-lane" className="block text-xs text-muted-foreground mb-1">{t('filterAgent')}</label>
+            <select id="activity-lane" value={selectedAgent}
+              onChange={(event) => { setSelectedAgent(event.target.value); setPage(0) }}
+              className="bg-surface-2 text-foreground text-sm rounded-md px-3 py-1.5 focus:outline-hidden focus:ring-1 focus:ring-primary/50 border border-border min-h-11 max-w-full">
+              <option value="">{t('filterAll')}</option>
+              {laneNames.map(name => <option key={name} value={name}>{name}</option>)}
+            </select>
           </div>
 
           {/* Type filter */}
