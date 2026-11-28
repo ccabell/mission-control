@@ -79,14 +79,14 @@ export function BriefingBarWidget({ data }: { data: DashboardData }) {
 
       {/* Bottom row: secondary metrics */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mt-1.5 text-2xs text-muted-foreground">
-        <span>{sessions.length} session{sessions.length !== 1 ? 's' : ''} today</span>
+        <span>{sessions.length} session{sessions.length !== 1 ? 's' : ''} in history</span>
 
         {isLocal && !isClaudeLoading && totalTokens > 0 && (
-          <span>{formatTokensShort(totalTokens)} tokens</span>
+          <span>{formatTokensShort(totalTokens)} historical tokens</span>
         )}
 
         {isLocal && !isClaudeLoading && (
-          <span>{costDisplay} spent</span>
+          <span>{costDisplay} {subscriptionLabel ? 'subscription' : 'historical estimate (not billing)'}</span>
         )}
 
         {!isSystemLoading && memPct != null && (

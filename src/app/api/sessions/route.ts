@@ -218,11 +218,10 @@ function getLocalClaudeSessions() {
 
     return rows.map((s) => {
       const lastMsg = s.last_message_at ? new Date(s.last_message_at).getTime() : 0
-      // Trust scanner state first, but fall back to derived recency so UI doesn't
-      // show stale "xh ago" when the active flag lags behind disk updates.
-      const derivedActive = lastMsg > 0 && (Date.now() - lastMsg) < LOCAL_SESSION_ACTIVE_WINDOW_MS
-      const isActive = s.is_active === 1 || derivedActive
-      const effectiveLastActivity = isActive ? Date.now() : lastMsg
+      // Imported scanner flags can outlive the host; require recent event time.
+      const derivedActive = lastMsg > 0 && Date.now() >= lastMsg && (Date.now() - lastMsg) < LOCAL_SESSION_ACTIVE_WINDOW_MS
+      const isActive = derivedActive
+      const effectiveLastActivity = lastMsg
       return {
         id: s.session_id,
         key: s.project_slug || s.session_id,

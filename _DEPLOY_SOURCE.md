@@ -24,3 +24,23 @@ use the previous Railway release, or use the unchanged local service. Hosted
 activity after the initial snapshot is separate from local database activity.
 
 Verified public URL: https://builderz-production.up.railway.app/ . Existing login and authenticated agents/tasks returned 200; unauthenticated agents returned 401. All 19 referenced JS/CSS assets returned 200. Domain targets runtime port 8080; host allowlist is comma-delimited. Local service retained. Agent integrations remain unverified.
+
+## A360 relay observations
+
+The existing Activity screen receives metadata through authenticated
+`/api/a360/observations`. Source: the existing Windows relay `REGISTRY.json`
+and queue records, read only. The publisher selects names, client, original
+session ID, message ID, status and original event time. It excludes bodies,
+subjects, results, event notes, roles and configuration. Events are deduplicated
+per workspace, including across cloud restarts, and retain their actual dates.
+The page shows source age and reports Stale after five minutes.
+
+This is observation, not chat control, a proof runner or a task database. Relay
+Done does not mean a feature shipped. Jira remains the source for project work.
+Existing sample/older Builderz agents are preserved, not relabelled as A360 lanes.
+
+Publisher: `scripts/publish-a360-observations.mjs`, using Node's `--env-file`
+with the existing central environment file. The separate Windows task
+`A360-Builderz-Observations` publishes every minute while Chris is signed in.
+It does not replace the local Builderz service task. PC-off data is Stale;
+the existing Railway dashboard watchdog owns alerts. No inference is called.

@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const params: any[] = []
 
     if (active === '1') {
-      query += ' AND is_active = 1'
+      query += " AND julianday(last_message_at) BETWEEN julianday('now', '-15 minutes') AND julianday('now')"
     }
 
     if (project) {
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     let countQuery = 'SELECT COUNT(*) as total FROM claude_sessions WHERE 1=1'
     const countParams: any[] = []
     if (active === '1') {
-      countQuery += ' AND is_active = 1'
+      countQuery += " AND julianday(last_message_at) BETWEEN julianday('now', '-15 minutes') AND julianday('now')"
     }
     if (project) {
       countQuery += ' AND project_slug = ?'
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
     const stats = db.prepare(`
       SELECT
         COUNT(*) as total_sessions,
-        SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active_sessions,
+        SUM(CASE WHEN julianday(last_message_at) BETWEEN julianday('now', '-15 minutes') AND julianday('now') THEN 1 ELSE 0 END) as active_sessions,
         SUM(input_tokens) as total_input_tokens,
         SUM(output_tokens) as total_output_tokens,
         SUM(estimated_cost) as total_estimated_cost,
