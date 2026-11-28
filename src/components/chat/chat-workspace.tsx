@@ -557,7 +557,7 @@ function SessionConversationView({
   onSavePreferences: (payload: { prefKey: string; displayName?: string; colorTag?: string }) => Promise<void>
 }) {
   const isGatewaySession = session.sessionKind === 'gateway'
-  const isPtyCapableKind = session.sessionKind === 'claude-code' || session.sessionKind === 'codex-cli'
+  const isPtyCapableKind = !session.sessionId.startsWith('registered-') && (session.sessionKind === 'claude-code' || session.sessionKind === 'codex-cli')
   const [viewMode, setViewMode] = useState<'terminal' | 'transcript'>('transcript')
   const prevSessionIdRef = useRef(session.sessionId)
   const transcriptScrollRef = useRef<HTMLDivElement | null>(null)
@@ -696,13 +696,13 @@ function SessionConversationView({
             />
           )}
           <span className={`rounded-full px-2 py-0.5 text-[10px] ${session.active ? 'bg-green-500/20 text-green-300' : 'bg-muted text-muted-foreground'}`}>
-            {session.active ? 'active' : 'idle'}
+            {session.sessionId.startsWith('registered-') ? 'activity unknown' : session.active ? 'active' : 'idle'}
           </span>
           <span className="font-mono-tight">{getSessionKindLabel(session.sessionKind)}</span>
           {session.model && <span className="text-muted-foreground/60">{session.model}</span>}
           {session.tokens && <span className="text-muted-foreground/60">{session.tokens}</span>}
           {session.workingDir && <span className="hidden truncate text-muted-foreground/50 sm:inline max-w-[200px]">{session.workingDir}</span>}
-          {session.age && <span className="text-muted-foreground/40">{session.age} ago</span>}
+          {session.age && session.age !== 'unknown' && <span className="text-muted-foreground/40">{session.age} ago</span>}
 
           {/* Terminal/Transcript toggle for PTY-capable sessions */}
           {isPtyCapableKind && (
@@ -940,6 +940,7 @@ function AgentAvatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' }
 
 function getConversationStatus(agents: Array<{ name: string; status: string }>, conversationId: string): string {
   if (conversationId.startsWith('session:')) {
+    if (conversationId.includes(':registered-')) return 'Registered lane · transcript not synced'
     if (conversationId.includes('claude-code')) return 'Local Claude session'
     if (conversationId.includes('codex-cli')) return 'Local Codex session'
     if (conversationId.includes('hermes')) return 'Local Hermes session'
