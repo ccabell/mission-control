@@ -1,6 +1,11 @@
 #!/bin/sh
 set -e
 
+if [ "$(id -u)" = "0" ]; then
+  chown -R nextjs:nodejs /app/.data
+  exec su -p -s /bin/sh nextjs -c /app/docker-entrypoint.sh
+fi
+
 . /app/scripts/load-env.sh
 
 # A360D-135: restore the verified SQLite online backup once, before the

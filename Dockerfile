@@ -80,7 +80,9 @@ RUN sed -i 's/\r$//' /app/docker-entrypoint.sh /app/scripts/load-env.sh && \
     chmod 755 /app/docker-entrypoint.sh && \
     chmod 644 /app/scripts/load-env.sh && \
     chmod -R a+rX /app/public/ /app/src/
-USER nextjs
+# Railway volumes and file uploads are root-owned. The entrypoint initializes
+# only this service's data volume and immediately drops to nextjs.
+USER root
 ENV PORT=3000
 EXPOSE 3000
 ENV HOSTNAME=0.0.0.0
