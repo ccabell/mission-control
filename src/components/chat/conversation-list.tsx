@@ -590,7 +590,7 @@ export function ConversationList({ onNewConversation }: ConversationListProps) {
             {registeredRows.length > 0 && (
               <div>
                 <div className="px-3 pt-2.5 pb-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-                  Registered Codex lanes · {registeredRows.length}
+                  Registered Codex lanes Â· {registeredRows.length}
                 </div>
                 {registeredRows.map(renderConversationItem)}
               </div>
