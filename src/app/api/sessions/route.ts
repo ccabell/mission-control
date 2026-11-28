@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
+import { config } from '@/lib/config'
+import { readObservation, observedCodexSessions } from '@/lib/a360-observations'
 import { getAllGatewaySessions } from '@/lib/sessions'
 import { syncClaudeSessions } from '@/lib/claude-sessions'
 import { scanCodexSessions } from '@/lib/codex-sessions'
@@ -23,15 +26,22 @@ export async function GET(request: NextRequest) {
   if (isolationDenied) return isolationDenied
 
   try {
-    const gatewaySessions = getAllGatewaySessions()
+    const gatewaySessions = A360_OBSERVATION_MODE ? [] : getAllGatewaySessions()
     const mappedGatewaySessions = mapGatewaySessions(gatewaySessions)
 
     // Always include local sessions alongside gateway sessions
     // Serve the latest database snapshot while the shared disk refresh runs.
     void syncClaudeSessions().catch(error => logger.error({ err: error }, 'Background session sync failed'))
-    const claudeSessions = getLocalClaudeSessions()
-    const codexSessions = getLocalCodexSessions()
-    const hermesSessions = getLocalHermesSessions()
+    const snapshot = A360_OBSERVATION_MODE ? readObservation(config.dataDir, auth.user.workspace_id ?? 1).snapshot : null
+    const claudeSessions = getLocalClaudeSessions().map(session => {
+      const metadata = snapshot?.sessions?.find(row => row.client === 'claude' && row.id === session.id)
+      return metadata ? {...session, lastActivity: Date.parse(metadata.updated), age: 'file updated ' + new Date(metadata.updated).toLocaleString(), active:false} : session
+    })
+    const scannedCodex = getLocalCodexSessions()
+    const codexSessions = A360_OBSERVATION_MODE && scannedCodex.length === 0
+      ? observedCodexSessions(snapshot)
+      : scannedCodex
+    const hermesSessions = A360_OBSERVATION_MODE ? [] : getLocalHermesSessions()
     const opencodeSessions = getLocalOpenCodeSessions()
     const localMerged = mergeLocalSessions(claudeSessions, codexSessions, hermesSessions, opencodeSessions)
 
@@ -218,11 +228,10 @@ function getLocalClaudeSessions() {
 
     return rows.map((s) => {
       const lastMsg = s.last_message_at ? new Date(s.last_message_at).getTime() : 0
-      // Trust scanner state first, but fall back to derived recency so UI doesn't
-      // show stale "xh ago" when the active flag lags behind disk updates.
-      const derivedActive = lastMsg > 0 && (Date.now() - lastMsg) < LOCAL_SESSION_ACTIVE_WINDOW_MS
-      const isActive = s.is_active === 1 || derivedActive
-      const effectiveLastActivity = isActive ? Date.now() : lastMsg
+      // Imported scanner flags can outlive the host; require recent event time.
+      const derivedActive = lastMsg > 0 && Date.now() >= lastMsg && (Date.now() - lastMsg) < LOCAL_SESSION_ACTIVE_WINDOW_MS
+      const isActive = derivedActive
+      const effectiveLastActivity = lastMsg
       return {
         id: s.session_id,
         key: s.project_slug || s.session_id,
@@ -386,9 +395,11 @@ function dedupeAndSortSessions(merged: Array<Record<string, any>>) {
     if (!existing || currentActivity > existingActivity) deduped.set(key, session)
   }
 
-  return Array.from(deduped.values())
+  const sorted = Array.from(deduped.values())
     .sort((a, b) => Number(b?.lastActivity || 0) - Number(a?.lastActivity || 0))
-    .slice(0, 100)
+  // An older registered Codex lane must not disappear behind Claude's history cap.
+  return [...sorted.filter(s => s.source !== 'relay-registration').slice(0, 200),
+    ...sorted.filter(s => s.source === 'relay-registration')]
 }
 
 function formatTokens(n: number): string {

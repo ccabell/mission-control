@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { APP_VERSION } from '@/lib/version'
+import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
 
 interface InitStep {
   key: string
@@ -49,7 +50,7 @@ const LOADER_AGENTS = [
 ] as const
 
 const LOADER_IMAGE_SOURCES = [
-  ...LOADER_AGENTS.map((agent) => agent.src),
+  ...LOADER_AGENTS.filter((agent) => !A360_OBSERVATION_MODE || agent.key === 'claude' || agent.key === 'codex').map((agent) => agent.src),
   '/brand/mc-logo-128.png',
 ] as const
 
@@ -113,7 +114,7 @@ function PageLoader({ steps }: { steps?: InitStep[] }) {
           {/* Phase 1: Four logos converge from cardinal directions (fades out at 1.8s) */}
           <div className="absolute inset-0 flex items-center justify-center animate-pair-fade-out">
             <div className="relative w-28 h-28">
-              {LOADER_AGENTS.map((agent) => (
+              {LOADER_AGENTS.filter((agent) => !A360_OBSERVATION_MODE || agent.key === 'claude' || agent.key === 'codex').map((agent) => (
                 <div key={agent.key} className={agent.wrapperClass}>
                   <div className="relative">
                     <Image
@@ -156,7 +157,7 @@ function PageLoader({ steps }: { steps?: InitStep[] }) {
             {t('missionControl')}
           </h1>
           <p className="text-2xs text-muted-foreground/60">
-            {t('agentOrchestration')}
+            {A360_OBSERVATION_MODE ? 'A360 agent observations' : t('agentOrchestration')}
           </p>
         </div>
 

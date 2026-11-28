@@ -1,43 +1,45 @@
 'use client'
 
 import { createElement, useEffect, useMemo, useState } from 'react'
+import dynamic from 'next/dynamic'
+import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
 import { usePathname, useRouter } from 'next/navigation'
 import { NavRail } from '@/components/layout/nav-rail'
 import { HeaderBar } from '@/components/layout/header-bar'
 import { LiveFeed } from '@/components/layout/live-feed'
 import { Dashboard } from '@/components/dashboard/dashboard'
-import { LogViewerPanel } from '@/components/panels/log-viewer-panel'
-import { CronManagementPanel } from '@/components/panels/cron-management-panel'
-import { MemoryBrowserPanel } from '@/components/panels/memory-browser-panel'
-import { CostTrackerPanel } from '@/components/panels/cost-tracker-panel'
-import { TaskBoardPanel } from '@/components/panels/task-board-panel'
-import { ActivityFeedPanel } from '@/components/panels/activity-feed-panel'
-import { AgentSquadPanelPhase3 } from '@/components/panels/agent-squad-panel-phase3'
-import { AgentCommsPanel } from '@/components/panels/agent-comms-panel'
-import { StandupPanel } from '@/components/panels/standup-panel'
-import { OrchestrationBar } from '@/components/panels/orchestration-bar'
-import { NotificationsPanel } from '@/components/panels/notifications-panel'
-import { UserManagementPanel } from '@/components/panels/user-management-panel'
-import { AuditTrailPanel } from '@/components/panels/audit-trail-panel'
-import { WebhookPanel } from '@/components/panels/webhook-panel'
-import { SettingsPanel } from '@/components/panels/settings-panel'
-import { GatewayConfigPanel } from '@/components/panels/gateway-config-panel'
-import { IntegrationsPanel } from '@/components/panels/integrations-panel'
-import { AlertRulesPanel } from '@/components/panels/alert-rules-panel'
-import { MultiGatewayPanel } from '@/components/panels/multi-gateway-panel'
-import { GatewayControlPanel } from '@/components/panels/gateway-control-panel'
-import { SuperAdminPanel } from '@/components/panels/super-admin-panel'
-import { OfficePanel } from '@/components/panels/office-panel'
-import { GitHubSyncPanel } from '@/components/panels/github-sync-panel'
-import { SkillsPanel } from '@/components/panels/skills-panel'
-import { LocalAgentsDocPanel } from '@/components/panels/local-agents-doc-panel'
-import { ChannelsPanel } from '@/components/panels/channels-panel'
-import { DebugPanel } from '@/components/panels/debug-panel'
-import { SecurityAuditPanel } from '@/components/panels/security-audit-panel'
-import { NodesPanel } from '@/components/panels/nodes-panel'
-import { ExecApprovalPanel } from '@/components/panels/exec-approval-panel'
-import { SystemMonitorPanel } from '@/components/panels/system-monitor-panel'
-import { ChatPagePanel } from '@/components/panels/chat-page-panel'
+const LogViewerPanel = dynamic(() => import('@/components/panels/log-viewer-panel').then(m => m.LogViewerPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const CronManagementPanel = dynamic(() => import('@/components/panels/cron-management-panel').then(m => m.CronManagementPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const MemoryBrowserPanel = dynamic(() => import('@/components/panels/memory-browser-panel').then(m => m.MemoryBrowserPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const CostTrackerPanel = dynamic(() => import('@/components/panels/cost-tracker-panel').then(m => m.CostTrackerPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const TaskBoardPanel = dynamic(() => import('@/components/panels/task-board-panel').then(m => m.TaskBoardPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const ActivityFeedPanel = dynamic(() => import('@/components/panels/activity-feed-panel').then(m => m.ActivityFeedPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const AgentSquadPanelPhase3 = dynamic(() => import('@/components/panels/agent-squad-panel-phase3').then(m => m.AgentSquadPanelPhase3), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const AgentCommsPanel = dynamic(() => import('@/components/panels/agent-comms-panel').then(m => m.AgentCommsPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const StandupPanel = dynamic(() => import('@/components/panels/standup-panel').then(m => m.StandupPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const OrchestrationBar = dynamic(() => import('@/components/panels/orchestration-bar').then(m => m.OrchestrationBar), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const NotificationsPanel = dynamic(() => import('@/components/panels/notifications-panel').then(m => m.NotificationsPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const UserManagementPanel = dynamic(() => import('@/components/panels/user-management-panel').then(m => m.UserManagementPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const AuditTrailPanel = dynamic(() => import('@/components/panels/audit-trail-panel').then(m => m.AuditTrailPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const WebhookPanel = dynamic(() => import('@/components/panels/webhook-panel').then(m => m.WebhookPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const SettingsPanel = dynamic(() => import('@/components/panels/settings-panel').then(m => m.SettingsPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const GatewayConfigPanel = dynamic(() => import('@/components/panels/gateway-config-panel').then(m => m.GatewayConfigPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const IntegrationsPanel = dynamic(() => import('@/components/panels/integrations-panel').then(m => m.IntegrationsPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const AlertRulesPanel = dynamic(() => import('@/components/panels/alert-rules-panel').then(m => m.AlertRulesPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const MultiGatewayPanel = dynamic(() => import('@/components/panels/multi-gateway-panel').then(m => m.MultiGatewayPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const GatewayControlPanel = dynamic(() => import('@/components/panels/gateway-control-panel').then(m => m.GatewayControlPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const SuperAdminPanel = dynamic(() => import('@/components/panels/super-admin-panel').then(m => m.SuperAdminPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const OfficePanel = dynamic(() => import('@/components/panels/office-panel').then(m => m.OfficePanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const GitHubSyncPanel = dynamic(() => import('@/components/panels/github-sync-panel').then(m => m.GitHubSyncPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const SkillsPanel = dynamic(() => import('@/components/panels/skills-panel').then(m => m.SkillsPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const LocalAgentsDocPanel = dynamic(() => import('@/components/panels/local-agents-doc-panel').then(m => m.LocalAgentsDocPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const ChannelsPanel = dynamic(() => import('@/components/panels/channels-panel').then(m => m.ChannelsPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const DebugPanel = dynamic(() => import('@/components/panels/debug-panel').then(m => m.DebugPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const SecurityAuditPanel = dynamic(() => import('@/components/panels/security-audit-panel').then(m => m.SecurityAuditPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const NodesPanel = dynamic(() => import('@/components/panels/nodes-panel').then(m => m.NodesPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const ExecApprovalPanel = dynamic(() => import('@/components/panels/exec-approval-panel').then(m => m.ExecApprovalPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const SystemMonitorPanel = dynamic(() => import('@/components/panels/system-monitor-panel').then(m => m.SystemMonitorPanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
+const ChatPagePanel = dynamic(() => import('@/components/panels/chat-page-panel').then(m => m.ChatPagePanel), { loading: () => <Loader variant="panel" label="Loading page" /> })
 import { ChatPanel } from '@/components/chat/chat-panel'
 import { STORAGE_GATEWAY_URL } from '@/lib/device-identity'
 import { getPluginPanel } from '@/lib/plugins'
@@ -275,7 +277,7 @@ export default function Home() {
     // Original mapped non-ok → data=null → the `else` branch cleared the update
     // (setOpenclawUpdate(null)). Reproduce that on thrown ApiError in the catch so a
     // failed/no-update check still clears any stale banner.
-    apiFetch<{ updateAvailable?: boolean; installed: string; latest: string; releaseUrl: string; releaseNotes: string; updateCommand: string }>('/api/openclaw/version')
+    if (!A360_OBSERVATION_MODE) apiFetch<{ updateAvailable?: boolean; installed: string; latest: string; releaseUrl: string; releaseNotes: string; updateCommand: string }>('/api/openclaw/version')
       .then(data => {
         if (data?.updateAvailable) {
           setOpenclawUpdate({
@@ -303,6 +305,14 @@ export default function Home() {
         throw err
       })
       .then(async data => {
+        if (A360_OBSERVATION_MODE) {
+          setDashboardMode('local')
+          setGatewayAvailable(false)
+          setCapabilitiesChecked(true)
+          markStep('capabilities')
+          markStep('connect')
+          return
+        }
         const localGatewayUrl = localStorage.getItem(STORAGE_GATEWAY_URL)
 
         if (data?.subscription) {
@@ -366,7 +376,7 @@ export default function Home() {
         setCapabilitiesChecked(true)
         markStep('capabilities')
         markStep('connect')
-        connectWithEnvFallback(null)
+        if (!A360_OBSERVATION_MODE) connectWithEnvFallback(null)
       })
 
     // Check onboarding state.
@@ -374,7 +384,8 @@ export default function Home() {
     // flags → shouldOpen:false (no-op) → markStep('config'). apiFetch throws on non-ok
     // instead, hitting the .catch that also marks 'config' — same net effect (onboarding
     // stays closed, boot step completes).
-    apiFetch<{ isAdmin?: boolean; showOnboarding?: boolean; completed?: boolean; skipped?: boolean }>('/api/onboarding')
+    if (A360_OBSERVATION_MODE) markStep('config')
+    else apiFetch<{ isAdmin?: boolean; showOnboarding?: boolean; completed?: boolean; skipped?: boolean }>('/api/onboarding')
       .then(data => {
         const decision = getOnboardingSessionDecision({
           isAdmin: data?.isAdmin === true,
@@ -401,6 +412,10 @@ export default function Home() {
     // setter. apiFetch throws on non-ok instead; the rejection is absorbed by
     // Promise.allSettled and the guarded .then is skipped — same net effect (no setter,
     // step still marked via .finally / pre-fetch markStep). Panels lazy-load as fallback.
+    // Optional panels load themselves on demand; never hold navigation for them.
+    markStep('agents')
+    markStep('projects')
+    markStep('skills')
     Promise.allSettled([
       apiFetch<{ agents?: unknown }>('/api/agents')
         .then((agentsData) => {
@@ -423,16 +438,17 @@ export default function Home() {
       // Memory graph can be slow — don't block boot
       (() => {
         markStep('memory')
+        if (A360_OBSERVATION_MODE) return Promise.resolve()
         return apiFetch<{ agents?: unknown }>('/api/memory/graph?agent=all')
           .then((graphData) => {
             if (graphData?.agents) setMemoryGraphAgents(graphData.agents as Parameters<typeof setMemoryGraphAgents>[0])
           })
       })(),
-      apiFetch<{ skills?: unknown; groups?: unknown; total?: unknown }>('/api/skills')
+      ...(A360_OBSERVATION_MODE ? [] : [apiFetch<{ skills?: unknown; groups?: unknown; total?: unknown }>('/api/skills')
         .then((skillsData) => {
           if (skillsData?.skills) setSkillsData(skillsData.skills as Parameters<typeof setSkillsData>[0], (skillsData.groups || []) as Parameters<typeof setSkillsData>[1], (skillsData.total || 0) as number)
         })
-        .finally(() => { markStep('skills') }),
+        .finally(() => { markStep('skills') })]),
     ]).catch(() => { /* panels will lazy-load as fallback */ })
 
   // eslint-disable-next-line react-hooks/exhaustive-deps -- boot once on mount, not on every pathname change
@@ -458,8 +474,8 @@ export default function Home() {
             <HeaderBar />
             <LocalModeBanner />
             <UpdateBanner />
-            <OpenClawUpdateBanner />
-            <OpenClawDoctorBanner />
+            {!A360_OBSERVATION_MODE && <OpenClawUpdateBanner />}
+            {!A360_OBSERVATION_MODE && <OpenClawDoctorBanner />}
           </>
         )}
         <main

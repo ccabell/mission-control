@@ -1,4 +1,5 @@
 'use client'
+import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
 
 import Image from 'next/image'
 import { useState, useEffect } from 'react'
@@ -839,7 +840,7 @@ function ContextSwitcher({ currentUser, isAdmin, isLocal, isConnected, tenants, 
   const tenantName = activeTenant?.display_name || defaultOrgName
   const projectName = activeProject?.name
   const contextLine = projectName ? `${tenantName} / ${projectName}` : tenantName
-  const connectionLabel = isLocal ? tcs('localMode') : isConnected ? tcs('connected') : tcs('disconnected')
+  const connectionLabel = isLocal ? (A360_OBSERVATION_MODE ? 'Observation mode' : tcs('localMode')) : isConnected ? tcs('connected') : tcs('disconnected')
   const connectionDotClass = isLocal ? 'bg-void-cyan' : isConnected ? 'bg-green-500' : 'bg-red-500'
 
   return (

@@ -1,5 +1,7 @@
 'use client'
 
+import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
+
 import { useCallback, useEffect, useRef, useState, FormEvent } from 'react'
 import Image from 'next/image'
 import { useTranslations } from 'next-intl'
@@ -366,7 +368,7 @@ export default function LoginPage() {
         )}
 
         {/* Advanced Settings — WebSocket gateway URL configuration */}
-        <div className="mb-4 rounded-lg border border-border overflow-hidden">
+        {!A360_OBSERVATION_MODE && (<div className="mb-4 rounded-lg border border-border overflow-hidden">
           <button
             type="button"
             onClick={() => setAdvancedOpen(o => !o)}
@@ -459,6 +461,8 @@ export default function LoginPage() {
           )}
         </div>
 
+        )}
+
         {/* Google Sign-In button — shown only when client ID is configured */}
         {googleClientId && (
           <div className={pendingApproval ? 'opacity-50 pointer-events-none' : ''}>
@@ -542,7 +546,7 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">{t('orchestrationTagline')}</p>
+        <p className="text-center text-xs text-muted-foreground mt-6">{A360_OBSERVATION_MODE ? 'A360 agent observations' : t('orchestrationTagline')}</p>
       </div>
     </div>
   )

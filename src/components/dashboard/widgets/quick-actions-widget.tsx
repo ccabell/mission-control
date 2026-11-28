@@ -1,5 +1,7 @@
 'use client'
 
+import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
+
 import {
   QuickAction,
   SpawnActionIcon,
@@ -88,7 +90,7 @@ function getContextualActions(data: DashboardData): Array<{
   if (isLocal) {
     actions.push({
       label: 'Sessions',
-      desc: 'Claude + Codex + Hermes',
+      desc: A360_OBSERVATION_MODE ? 'Claude + Codex' : 'Claude + Codex + Hermes',
       tab: 'sessions',
       icon: <SessionIcon />,
       priority: 30,

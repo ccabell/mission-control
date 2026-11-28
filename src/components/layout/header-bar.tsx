@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { ThemeSelector } from '@/components/ui/theme-selector'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { DigitalClock } from '@/components/ui/digital-clock'
+import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
 import { getNavigationMetrics, navigationMetricEventName } from '@/lib/navigation-metrics'
 
 interface SearchResult {
@@ -472,7 +473,7 @@ function ModeBadge({
     return (
       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-2xs bg-void-cyan/10 border border-void-cyan/25">
         <span className="w-1.5 h-1.5 rounded-full bg-void-cyan" />
-        <span className="font-medium text-void-cyan">{th('local')}</span>
+        <span className="font-medium text-void-cyan">{A360_OBSERVATION_MODE ? 'Observing' : th('local')}</span>
       </div>
     )
   }

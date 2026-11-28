@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
 import net from 'node:net'
 import os from 'node:os'
 import { existsSync, statSync } from 'node:fs'
@@ -535,8 +536,8 @@ async function performHealthCheck() {
     })
   }
 
-  // Check gateway connection
-  try {
+  // No gateway belongs to the A360 observation deployment.
+  if (!A360_OBSERVATION_MODE) try {
     const gatewayStatus = await getGatewayStatus()
     health.checks.push({
       name: 'Gateway',
@@ -613,6 +614,12 @@ async function performHealthCheck() {
 }
 
 async function getCapabilities(request?: NextRequest, includeGlobalRuntime = true) {
+  if (A360_OBSERVATION_MODE) return {
+    gateway: false, openclawHome: false, claudeHome: false, claudeSessions: 0,
+    hermesInstalled: false, hermesSessions: 0, subscription: null, subscriptions: [],
+    processUser: 'A360', interfaceMode: 'essential', dashboardRegistration: null,
+    isDocker: existsSync('/.dockerenv'),
+  }
   // Probe configured gateways (if any) or fall back to the default port.
   // A DB row alone isn't enough — the gateway must actually be reachable.
   let gatewayReachable = false

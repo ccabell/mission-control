@@ -286,7 +286,7 @@ export function ConversationList({ onNewConversation }: ConversationListProps) {
                 : 'Gateway'
           const prefKey = `${sessionKind}:${s.id}`
           const pref = prefs[prefKey] || {}
-          const defaultName = s.source === 'local'
+          const defaultName = s.source === 'host-metadata' ? `Codex • ${s.key || s.id}` : s.source === 'local'
             ? `${kindLabel} • ${s.key || s.id}`
             : `${s.agent || 'Gateway'} • ${s.key || s.id}`
           const sessionName = pref.name || defaultName
@@ -361,7 +361,8 @@ export function ConversationList({ onNewConversation }: ConversationListProps) {
 
   const allSessions = filteredConversations.filter((c) => c.source === 'session')
   const activeRows = allSessions.filter((c) => c.session?.active)
-  const recentRows = allSessions.filter((c) => !c.session?.active)
+  const registeredRows = allSessions.filter(c => c.session?.sessionId.startsWith('registered-'))
+  const recentRows = allSessions.filter((c) => !c.session?.active && !c.session?.sessionId.startsWith('registered-'))
   // Direct agent conversations (agent_<name>) are not gateway/local sessions but
   // must still appear in the list once started (issue #611).
   const directRows = filteredConversations.filter((c) => c.source !== 'session')
@@ -584,6 +585,14 @@ export function ConversationList({ onNewConversation }: ConversationListProps) {
                   </div>
                 </div>
                 {activeRows.map(renderConversationItem)}
+              </div>
+            )}
+            {registeredRows.length > 0 && (
+              <div>
+                <div className="px-3 pt-2.5 pb-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Registered Codex lanes · {registeredRows.length}
+                </div>
+                {registeredRows.map(renderConversationItem)}
               </div>
             )}
             {recentRows.length > 0 && (

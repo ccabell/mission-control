@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
 import { requireRole } from '@/lib/auth'
 import { runOpenClaw } from '@/lib/command'
 import { config } from '@/lib/config'
@@ -114,6 +115,7 @@ export async function GET(request: Request) {
   }
 
   // 1) Cache hit — return immediately.
+  if (A360_OBSERVATION_MODE) return NextResponse.json({ enabled: false, summary: 'OpenClaw is not used by this A360 console.' })
   const cached = doctorCache.cached
   if (cached && Date.now() - cached.fetchedAt < doctorCache.ttlMs) {
     return NextResponse.json(cached.payload, {
@@ -146,6 +148,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: auth.error }, { status: auth.status })
   }
 
+  if (A360_OBSERVATION_MODE) return NextResponse.json({ error: 'OpenClaw is not used by this A360 console.' }, { status: 409 })
   const limitKey = `${auth.user.tenant_id ?? 1}:${auth.user.workspace_id ?? 1}:${auth.user.id}`
   const limited = openClawMaintenanceLimiter(limitKey)
   if (limited) return limited

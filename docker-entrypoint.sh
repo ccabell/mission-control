@@ -1,7 +1,29 @@
 #!/bin/sh
 set -e
 
+if [ "$(id -u)" = "0" ]; then
+  chown -R nextjs:nodejs /app/.data
+  exec su -p -s /bin/sh nextjs -c /app/docker-entrypoint.sh
+fi
+
 . /app/scripts/load-env.sh
+
+# A360D-135: restore the verified SQLite online backup once, before the
+# application opens its database. Preserve the initial cloud database and WAL.
+if [ -f /app/.data/restore-seed.db ]; then
+  if [ -e /app/.data/mission-control.db.pre-migration ]; then
+    printf '[entrypoint] Refusing repeated database restore\n' >&2
+    exit 1
+  fi
+  for name in mission-control.db mission-control.db-wal mission-control.db-shm; do
+    if [ -f "/app/.data/$name" ]; then
+      mv "/app/.data/$name" "/app/.data/$name.pre-migration"
+    fi
+  done
+  cp /app/.data/restore-seed.db /app/.data/mission-control.db
+  mv /app/.data/restore-seed.db /app/.data/restored-seed.db
+  printf '[entrypoint] Restored initial database snapshot\n'
+fi
 
 # --- Load .env as literal configuration if present ---
 if [ -f /app/.env ]; then

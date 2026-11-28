@@ -1,5 +1,7 @@
 'use client'
 
+import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
+
 import { useState, useCallback } from 'react'
 import { apiFetch } from '@/lib/api-client'
 import { useMissionControl } from '@/store'
@@ -95,7 +97,7 @@ export function Dashboard() {
           .finally(() => setLoading(prev => ({ ...prev, github: false })))
       )
 
-      requests.push(
+      if (!A360_OBSERVATION_MODE) requests.push(
         apiFetch<any>('/api/hermes')
           .then((data) => {
             if (data?.cronJobCount != null) setHermesCronJobCount(data.cronJobCount)
@@ -154,7 +156,8 @@ export function Dashboard() {
 
   const codexHealth = isSessionsLoading
     ? { value: 'Loading...', status: 'warn' as const }
-    : getProviderHealth(codexActive, codexLocalSessions.length)
+    : A360_OBSERVATION_MODE ? { value: 'Live activity unknown', status: 'warn' as const }
+      : getProviderHealth(codexActive, codexLocalSessions.length)
 
   const hermesHealth = isSessionsLoading
     ? { value: 'Loading...', status: 'warn' as const }
