@@ -22,3 +22,5 @@ The local service at `http://100.79.143.126:3100/` remains running. Do not retir
 until the hosted replacement, login and persistent data are verified. Rollback:
 use the previous Railway release, or use the unchanged local service. Hosted
 activity after the initial snapshot is separate from local database activity.
+
+Verified public URL: https://builderz-production.up.railway.app/ . Existing login and authenticated agents/tasks returned 200; unauthenticated agents returned 401. All 19 referenced JS/CSS assets returned 200. Domain targets runtime port 8080; host allowlist is comma-delimited. Local service retained. Agent integrations remain unverified.
