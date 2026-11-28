@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   runCommand: vi.fn(async () => ({ stdout: '', stderr: '', code: 0 })),
 }))
 
+vi.mock('@/lib/a360-mode', () => ({ A360_OBSERVATION_MODE: false }))
 vi.mock('@/lib/auth', () => ({
   requireRole: vi.fn(() => ({ user: { role: 'operator', username: 'tester' } })),
 }))

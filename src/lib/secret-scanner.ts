@@ -120,3 +120,14 @@ export function redactSecrets(text: string): string {
   }
   return result
 }
+
+// Chat exports fail closed for detected credentials. Never include even a
+// partial token, reasoning, or a tool result in a hosted history receipt.
+export function safeHistoryText(text: string): string {
+  const suspicious = scanForSecrets(text).length > 0 ||
+    /\b(?:sk-(?:proj-|svcacct-)?|xox[baprs]-)[A-Za-z0-9_-]{12,}/.test(text) ||
+    /(?:password|passwd|auth_pass|api[_-]?key|access[_-]?token|client[_-]?secret|authorization)\s*["']?\s*[:=]\s*["']?[^\s"']{3,}/i.test(text) ||
+    /https?:\/\/[^\s<>]*[?&](?:[^\s<>]*(?:token|secret|code|signature|key|password)=)/i.test(text)
+  if (suspicious) return '[Message withheld: possible secret.]'
+  return text.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').slice(0, 4000).trim()
+}

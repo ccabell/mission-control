@@ -1,3 +1,4 @@
+import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth'
 import { callOpenClawGateway } from '@/lib/openclaw-gateway'
@@ -16,6 +17,7 @@ export async function POST(
 ) {
   const auth = requireRole(request, 'operator')
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if (A360_OBSERVATION_MODE) return NextResponse.json({ error: 'This dashboard observes saved chats. Send work in the original chat; remote session control is not connected.' }, { status: 409 })
   const isolationDenied = denyUnscopedResourceForStrictWorkspace(auth.user, 'gateway_sessions', new URL(request.url).pathname)
   if (isolationDenied) return isolationDenied
 

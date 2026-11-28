@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ run: vi.fn(), stop: vi.fn(), gateway: vi.fn(), denied: false }))
+vi.mock('@/lib/a360-mode', () => ({ A360_OBSERVATION_MODE: false }))
 vi.mock('@/lib/auth', () => ({ requireRole: () => ({ user: { role: 'operator', username: 'tester', workspace_id: 7 } }) }))
 vi.mock('@/lib/workspace-isolation', () => ({ denyUnscopedResourceForStrictWorkspace: () => mocks.denied ? new Response(null, { status: 403 }) : null }))
 vi.mock('@/lib/cli-process', () => ({ runCliProcess: mocks.run, stopCliRun: mocks.stop }))

@@ -1,3 +1,4 @@
+import { A360_OBSERVATION_MODE } from '@/lib/a360-mode'
 import { promises as fs, constants as fsConstants } from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -164,6 +165,7 @@ async function getSessionJsonlMtime(sessionId: string): Promise<number | null> {
 export async function POST(request: NextRequest) {
   const auth = requireRole(request, 'operator')
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if (A360_OBSERVATION_MODE) return NextResponse.json({ error: 'This dashboard observes saved chats. Send work in the original chat; remote session control is not connected.' }, { status: 409 })
   const isolationDenied = denyUnscopedResourceForStrictWorkspace(auth.user, 'local_sessions', new URL(request.url).pathname)
   if (isolationDenied) return isolationDenied
 

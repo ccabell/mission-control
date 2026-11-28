@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path'
 import Database from 'better-sqlite3'
 import { homedir } from 'node:os'
 import { pathToFileURL } from 'node:url'
+import { publishRequestedHistory } from './collect-a360-chat-history.mjs'
 
 const validName = value => typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(value)
 const validDate = value => typeof value === 'string' && Number.isFinite(Date.parse(value))
@@ -76,6 +77,7 @@ export async function publishObservations() {
   if (!response.ok) throw Error(`Observation publish failed (${response.status})`)
   const result = await response.json()
   console.log(JSON.stringify({ published: true, lanes: result.lanes, newActivities: result.added, generated: result.generated, mode: result.mode }))
+  await publishRequestedHistory(result.historyRequests, base, { 'Content-Type': 'application/json', 'x-api-key': process.env.API_KEY, Origin: new URL(base).origin })
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

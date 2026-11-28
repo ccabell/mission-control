@@ -98,6 +98,272 @@
     }
   ],
   "paths": {
+    "/api/a360/chat-history": {
+      "get": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Read selected Codex history cache",
+        "description": "Authenticated, workspace-scoped response. No-store.",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "401": {
+            "description": "Request refused or unavailable"
+          },
+          "403": {
+            "description": "Request refused or unavailable"
+          },
+          "409": {
+            "description": "Request refused or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Request selected Codex history from Windows",
+        "description": "Operator only. Requires a chat in the fresh workspace index. No CLI or model execution; excerpts expire after 30 minutes.",
+        "responses": {
+          "202": {
+            "description": "Successful response"
+          },
+          "401": {
+            "description": "Request refused or unavailable"
+          },
+          "403": {
+            "description": "Request refused or unavailable"
+          },
+          "409": {
+            "description": "Request refused or unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "session_id"
+                ],
+                "properties": {
+                  "session_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Receive requested Codex history",
+        "description": "Operator publisher only. Must match a pending request in the authenticated workspace. Text only, sanitized before persistence.",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "401": {
+            "description": "Request refused or unavailable"
+          },
+          "403": {
+            "description": "Request refused or unavailable"
+          },
+          "409": {
+            "description": "Request refused or unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "request_id",
+                  "session_id",
+                  "status",
+                  "fetched",
+                  "messages"
+                ],
+                "properties": {
+                  "request_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "session_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "available",
+                      "unavailable"
+                    ]
+                  },
+                  "fetched": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "messages": {
+                    "type": "array",
+                    "maxItems": 40,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "role",
+                        "text"
+                      ],
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "assistant"
+                          ]
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/a360/observations": {
+      "get": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Read Windows observation snapshot",
+        "description": "Authenticated, workspace-scoped response. No-store.",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "401": {
+            "description": "Request refused or unavailable"
+          },
+          "403": {
+            "description": "Request refused or unavailable"
+          },
+          "409": {
+            "description": "Request refused or unavailable"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Publish Windows observation snapshot",
+        "description": "Operator only. Strict metadata-only snapshot, generated within five minutes. Response includes IDs of explicitly requested history reads; no message bodies in the snapshot.",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "401": {
+            "description": "Request refused or unavailable"
+          },
+          "403": {
+            "description": "Request refused or unavailable"
+          },
+          "409": {
+            "description": "Request refused or unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "schema",
+                  "generated",
+                  "host",
+                  "lanes",
+                  "events"
+                ],
+                "properties": {
+                  "schema": {
+                    "const": "a360-relay-observations/1"
+                  },
+                  "generated": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "host": {
+                    "const": "windows-primary"
+                  },
+                  "lanes": {
+                    "type": "array",
+                    "maxItems": 500,
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "events": {
+                    "type": "array",
+                    "maxItems": 500,
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "sessions": {
+                    "type": "array",
+                    "maxItems": 200,
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "sources": {
+                    "type": "array",
+                    "maxItems": 2,
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/activities": {
       "get": {
         "tags": [

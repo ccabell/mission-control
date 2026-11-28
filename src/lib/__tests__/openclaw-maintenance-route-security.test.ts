@@ -7,14 +7,17 @@ const {
   openClawMaintenanceLimiterMock,
   requireRoleMock,
   runOpenClawMock,
+  observationMode,
 } = vi.hoisted(() => ({
   archiveOrphanTranscriptsForStateDirMock: vi.fn(),
   logAuditEventMock: vi.fn(),
   openClawMaintenanceLimiterMock: vi.fn(),
   requireRoleMock: vi.fn(),
   runOpenClawMock: vi.fn(),
+  observationMode: { enabled: false },
 }))
 
+vi.mock('@/lib/a360-mode', () => ({ get A360_OBSERVATION_MODE() { return observationMode.enabled } }))
 vi.mock('@/lib/auth', () => ({ requireRole: requireRoleMock }))
 vi.mock('@/lib/command', () => ({ runOpenClaw: runOpenClawMock }))
 vi.mock('@/lib/db', () => ({ logAuditEvent: logAuditEventMock }))
@@ -51,6 +54,7 @@ describe('OpenClaw maintenance route security', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
+    observationMode.enabled = false
     requireRoleMock.mockReturnValue(admin)
     openClawMaintenanceLimiterMock.mockReturnValue(null)
     archiveOrphanTranscriptsForStateDirMock.mockReturnValue({ archivedOrphans: 0, storesScanned: 1 })
@@ -104,6 +108,15 @@ describe('OpenClaw maintenance route security', () => {
     expect(malformed.status).toBe(400)
     expect(unconfirmed.status).toBe(400)
     expect(runOpenClawMock).not.toHaveBeenCalled()
+  })
+
+  it('refuses doctor maintenance in hosted observation mode without running commands', async () => {
+    observationMode.enabled = true
+    const { POST } = await import('@/app/api/openclaw/doctor/route')
+    const response = await POST(request('/api/openclaw/doctor', JSON.stringify({ confirmation: 'fix_openclaw' })))
+    expect(response.status).toBe(409)
+    expect(runOpenClawMock).not.toHaveBeenCalled()
+    expect(archiveOrphanTranscriptsForStateDirMock).not.toHaveBeenCalled()
   })
 
   it('updates stable OpenClaw without returning command output', async () => {

@@ -33,7 +33,7 @@ export function LocalModeBanner() {
       <span className="font-medium text-foreground">A360 observation mode. </span>
       {feeds.length === 0 && <span>Metadata feed not verified. </span>}
       {feeds.map(feed => { const stale = !feed.checked || now - Date.parse(feed.checked) > 300000 || feed.status !== 'read'; return <span key={feed.client} className={stale ? 'text-destructive' : ''}>{feed.client === 'codex' ? 'Codex' : 'Claude'}: {stale ? 'Stale / unavailable' : 'checked ' + new Date(feed.checked!).toLocaleString()}. </span> })}
-      Chats show saved session history, not a live connection to the original chat. Activity shows relay updates and their freshness. Send requests in your original Claude or Codex chat.
+      Chats show saved history; Codex history loads only when requested. Activity shows relay updates and their freshness. Send work requests in your original Claude or Codex chat.
     </div>
   )
 

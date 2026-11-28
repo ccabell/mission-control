@@ -7,6 +7,7 @@ import { apiFetch, ApiError } from '@/lib/api-client'
 import { useSmartPoll } from '@/lib/use-smart-poll'
 import { createClientLogger } from '@/lib/client-logger'
 import { ConversationList } from './conversation-list'
+import { CodexHistory } from './codex-history'
 import { MessageList } from './message-list'
 import { ChatInput } from './chat-input'
 import { Button } from '@/components/ui/button'
@@ -253,7 +254,7 @@ export function ChatWorkspace({ mode = 'embedded', onClose }: ChatWorkspaceProps
     if ((/^(registered|metadata)-/).test(sessionMeta.sessionId)) {
       setSessionTranscript([])
       setSessionTranscriptLoading(false)
-      setSessionTranscriptError('Codex metadata only. Transcript is not synced; use the original Codex chat. This does not prove the agent is running. Original chat: ' + sessionMeta.sessionId.replace(/^(registered|metadata)-/, ''))
+      setSessionTranscriptError(null)
       return
     }
 
@@ -358,7 +359,7 @@ export function ChatWorkspace({ mode = 'embedded', onClose }: ChatWorkspaceProps
             <span className="text-sm font-semibold text-foreground">Agent Chat</span>
           </div>
           <span className="hidden text-xs text-muted-foreground sm:inline">
-            {agents.filter(a => a.status === 'busy' || a.status === 'idle').length} online
+            {A360_OBSERVATION_MODE ? 'Saved chats' : `${agents.filter(a => a.status === 'busy' || a.status === 'idle').length} online`}
           </span>
         </div>
 
@@ -438,7 +439,7 @@ export function ChatWorkspace({ mode = 'embedded', onClose }: ChatWorkspaceProps
                   </div>
                 </div>
                 {/* Split pane button for sessions */}
-                {selectedConversation?.source === 'session' && selectedConversation.session && (
+                {!A360_OBSERVATION_MODE && selectedConversation?.source === 'session' && selectedConversation.session && (
                   <button
                     type="button"
                     onClick={() => {
@@ -464,7 +465,7 @@ export function ChatWorkspace({ mode = 'embedded', onClose }: ChatWorkspaceProps
                 <div className="flex items-center justify-between px-3 py-1 border-b border-border/50 bg-surface-1 shrink-0">
                   <span className="text-[10px] text-muted-foreground/60">{splitPanes.length} pane{splitPanes.length !== 1 ? 's' : ''}</span>
                   <div className="flex items-center gap-1.5">
-                    {selectedConversation?.source === 'session' && selectedConversation.session && (
+                    {!A360_OBSERVATION_MODE && selectedConversation?.source === 'session' && selectedConversation.session && (
                       <button
                         type="button"
                         onClick={() => {
@@ -557,7 +558,8 @@ function SessionConversationView({
   onSavePreferences: (payload: { prefKey: string; displayName?: string; colorTag?: string }) => Promise<void>
 }) {
   const isGatewaySession = session.sessionKind === 'gateway'
-  const isPtyCapableKind = !(/^(registered|metadata)-/).test(session.sessionId) && (session.sessionKind === 'claude-code' || session.sessionKind === 'codex-cli')
+  const isRemoteCodex = A360_OBSERVATION_MODE && (/^(registered|metadata)-/).test(session.sessionId)
+  const isPtyCapableKind = !A360_OBSERVATION_MODE && (session.sessionKind === 'claude-code' || session.sessionKind === 'codex-cli')
   const [viewMode, setViewMode] = useState<'terminal' | 'transcript'>('transcript')
   const prevSessionIdRef = useRef(session.sessionId)
   const transcriptScrollRef = useRef<HTMLDivElement | null>(null)
@@ -696,13 +698,13 @@ function SessionConversationView({
             />
           )}
           <span className={`rounded-full px-2 py-0.5 text-[10px] ${session.active ? 'bg-green-500/20 text-green-300' : 'bg-muted text-muted-foreground'}`}>
-            {(/^(registered|metadata)-/).test(session.sessionId) ? 'runtime unknown' : session.active ? 'active' : 'idle'}
+            {A360_OBSERVATION_MODE ? 'runtime unknown' : session.active ? 'active' : 'idle'}
           </span>
           <span className="font-mono-tight">{getSessionKindLabel(session.sessionKind)}</span>
           {session.model && <span className="text-muted-foreground/60">{session.model}</span>}
           {session.tokens && <span className="text-muted-foreground/60">{session.tokens}</span>}
           {session.workingDir && <span className="hidden truncate text-muted-foreground/50 sm:inline max-w-[200px]">{session.workingDir}</span>}
-          {session.age && session.age !== 'unknown' && <span className="text-muted-foreground/40">{session.age} ago</span>}
+          {session.age && session.age !== 'unknown' && <span className="text-muted-foreground">{session.age}{session.age.includes('updated ') ? '' : ' ago'}</span>}
 
           {/* Terminal/Transcript toggle for PTY-capable sessions */}
           {isPtyCapableKind && (
@@ -788,6 +790,7 @@ function SessionConversationView({
       {/* Transcript view */}
       {(!isPtyCapableKind || viewMode === 'transcript') && (
         <div ref={transcriptScrollRef} className="flex-1 overflow-y-auto font-mono-tight py-2">
+          {isRemoteCodex && <CodexHistory key={session.sessionId} sessionId={session.sessionId.replace(/^(registered|metadata)-/, '')} />}
           {loading && (
             <div className="space-y-2 px-4">
               <div className="h-4 w-3/4 animate-pulse rounded bg-surface-1/60" />
@@ -799,7 +802,7 @@ function SessionConversationView({
           {!loading && error && (
             <div className="px-4 text-xs text-red-400">{error}</div>
           )}
-          {!loading && !error && messages.length === 0 && (
+          {!isRemoteCodex && !loading && !error && messages.length === 0 && (
             <div className="px-4 text-xs text-muted-foreground">
               {isGatewaySession ? 'No messages loaded for this gateway session.' : 'No transcript snippets found for this session.'}
             </div>
@@ -940,7 +943,9 @@ function AgentAvatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' }
 
 function getConversationStatus(agents: Array<{ name: string; status: string }>, conversationId: string): string {
   if (conversationId.startsWith('session:')) {
-    if (conversationId.includes(':registered-')) return 'Registered lane · transcript not synced'
+    if (conversationId.includes(':registered-')) return 'Registered lane · history on request'
+    if (conversationId.includes(':metadata-')) return 'Windows Codex chat · history on request'
+    if (A360_OBSERVATION_MODE) return 'Saved session history'
     if (conversationId.includes('claude-code')) return 'Local Claude session'
     if (conversationId.includes('codex-cli')) return 'Local Codex session'
     if (conversationId.includes('hermes')) return 'Local Hermes session'
